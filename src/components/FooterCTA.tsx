@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { motion } from "framer-motion";
 
 const FooterCTA = () => {
   const [form, setForm] = useState({ name: "", email: "", message: "" });
@@ -16,7 +17,13 @@ const FooterCTA = () => {
   return (
     <section id="contato" className="py-24 md:py-32 bg-navy-gradient text-primary-foreground">
       <div className="container mx-auto px-6 max-w-4xl">
-        <div className="text-center mb-16">
+        <motion.div
+          className="text-center mb-16"
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 0.7 }}
+        >
           <p className="text-bronze-light font-sans text-sm tracking-[0.2em] uppercase mb-4">Contato</p>
           <h2 className="text-3xl md:text-4xl font-serif font-bold">
             Pronto Para Automatizar com Segurança?
@@ -24,9 +31,16 @@ const FooterCTA = () => {
           <p className="mt-4 text-primary-foreground/50 max-w-lg mx-auto">
             Agende uma demonstração privada e descubra quantas horas faturáveis seu escritório está desperdiçando.
           </p>
-        </div>
+        </motion.div>
 
-        <form onSubmit={handleSubmit} className="max-w-md mx-auto space-y-5">
+        <motion.form
+          onSubmit={handleSubmit}
+          className="max-w-md mx-auto space-y-5"
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ delay: 0.2, duration: 0.7 }}
+        >
           <Input
             placeholder="Seu nome"
             value={form.name}
@@ -52,7 +66,7 @@ const FooterCTA = () => {
           <Button variant="hero" size="lg" className="w-full">
             Solicitar Demonstração
           </Button>
-        </form>
+        </motion.form>
 
         <div className="mt-20 pt-10 border-t border-bronze/10 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-1">

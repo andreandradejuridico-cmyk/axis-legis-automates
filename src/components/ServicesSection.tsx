@@ -1,4 +1,5 @@
 import { MessageSquare, FileSearch, Bell } from "lucide-react";
+import { motion } from "framer-motion";
 
 const services = [
   {
@@ -25,16 +26,29 @@ const ServicesSection = () => {
   return (
     <section id="servicos" className="py-24 md:py-32 bg-muted/50">
       <div className="container mx-auto px-6 max-w-5xl">
-        <div className="text-center mb-16">
+        <motion.div
+          className="text-center mb-16"
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 0.7 }}
+        >
           <p className="text-bronze font-sans text-sm tracking-[0.2em] uppercase mb-4">Soluções</p>
           <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
             Ecossistema de Automação Jurídica
           </h2>
-        </div>
+        </motion.div>
 
         <div className="grid md:grid-cols-3 gap-8">
           {services.map((service, i) => (
-            <div key={i} className="group bg-card rounded-lg p-8 shadow-card border border-border hover:shadow-premium hover:border-bronze/20 transition-all duration-500">
+            <motion.div
+              key={i}
+              className="group bg-card rounded-lg p-8 shadow-card border border-border hover:shadow-premium hover:border-bronze/20 transition-all duration-500 hover:-translate-y-1"
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-80px" }}
+              transition={{ delay: i * 0.15, duration: 0.6 }}
+            >
               <span className="inline-block text-xs font-sans font-semibold tracking-wider uppercase text-bronze bg-bronze/10 px-3 py-1 rounded-sm mb-6">
                 {service.tag}
               </span>
@@ -47,7 +61,7 @@ const ServicesSection = () => {
               <p className="text-muted-foreground text-sm leading-relaxed">
                 {service.description}
               </p>
-            </div>
+            </motion.div>
           ))}
         </div>
       </div>
