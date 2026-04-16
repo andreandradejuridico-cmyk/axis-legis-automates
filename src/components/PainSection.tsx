@@ -1,4 +1,5 @@
 import { Clock, FileWarning, ScrollText } from "lucide-react";
+import { motion } from "framer-motion";
 
 const pains = [
   {
@@ -22,17 +23,30 @@ const PainSection = () => {
   return (
     <section className="py-24 md:py-32 bg-background">
       <div className="container mx-auto px-6 max-w-5xl">
-        <div className="text-center mb-16">
+        <motion.div
+          className="text-center mb-16"
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 0.7 }}
+        >
           <p className="text-bronze font-sans text-sm tracking-[0.2em] uppercase mb-4">O problema</p>
           <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
             Seu Tempo é o Ativo Mais Caro do Escritório
           </h2>
-        </div>
+        </motion.div>
 
         <div className="grid md:grid-cols-3 gap-8">
           {pains.map((item, i) => (
-            <div key={i} className="group">
-              <div className="bg-card rounded-lg p-8 shadow-card border border-border hover:border-bronze/30 transition-all duration-300 h-full flex flex-col">
+            <motion.div
+              key={i}
+              className="group"
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-80px" }}
+              transition={{ delay: i * 0.15, duration: 0.6 }}
+            >
+              <div className="bg-card rounded-lg p-8 shadow-card border border-border hover:border-bronze/30 transition-all duration-300 h-full flex flex-col hover:-translate-y-1">
                 <div className="w-12 h-12 rounded-md bg-muted flex items-center justify-center mb-6 group-hover:bg-bronze/10 transition-colors">
                   <item.icon className="w-6 h-6 text-bronze" />
                 </div>
@@ -44,7 +58,7 @@ const PainSection = () => {
                   {item.solution}
                 </p>
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       </div>
