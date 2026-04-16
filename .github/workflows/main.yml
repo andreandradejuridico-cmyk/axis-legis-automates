@@ -29,5 +29,5 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./dist/ # Geralmente a pasta de build do Vite
-          server-dir: public_html/ # Pasta destino na Hostinger
+          server-dir: / # Pasta destino na Hostinger
           dangerous-clean-slate: true # Apaga arquivos antigos para evitar conflitos
