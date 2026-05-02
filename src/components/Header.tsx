@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import logo from "@/assets/logo-mark.png";
+import logo from "@/assets/logo-axis-legis-full.png";
 
 const Header = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -14,16 +14,12 @@ const Header = () => {
       transition={{ duration: 0.6, ease: "easeOut" }}
     >
       <div className="container mx-auto px-6 h-20 flex items-center justify-between">
-        <a href="#" className="flex items-center gap-3">
+        <a href="#" className="flex items-center" aria-label="Axis Legis">
           <img
             src={logo}
             alt="Axis Legis"
-            className="h-11 w-11 object-contain drop-shadow-[0_2px_8px_rgba(192,196,204,0.25)]"
+            className="h-14 md:h-16 w-auto object-contain drop-shadow-[0_2px_12px_rgba(192,196,204,0.25)]"
           />
-          <div className="flex items-center gap-1.5">
-            <span className="text-2xl font-sans font-bold tracking-tight text-silver-light">Axis</span>
-            <span className="text-2xl font-serif font-bold tracking-tight text-bronze-light">Legis</span>
-          </div>
         </a>
 
         <nav className="hidden md:flex items-center gap-10">
