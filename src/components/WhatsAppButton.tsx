@@ -9,10 +9,10 @@ const WhatsAppButton = () => {
   useEffect(() => {
     supabase
       .from("whatsapp_settings")
-      .select("phone_number")
+      .select("default_number")
       .maybeSingle()
       .then(({ data }) => {
-        if (data?.phone_number) setPhone(data.phone_number.replace(/\D/g, ""));
+        if (data?.default_number) setPhone(data.default_number.replace(/\D/g, ""));
       });
   }, []);
 
