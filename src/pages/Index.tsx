@@ -5,6 +5,7 @@ import ServicesSection from "@/components/ServicesSection";
 import AuthoritySection from "@/components/AuthoritySection";
 import ProcessSection from "@/components/ProcessSection";
 import FooterCTA from "@/components/FooterCTA";
+import ChatWidget from "@/components/ChatWidget";
 
 const Index = () => {
   return (
@@ -16,6 +17,7 @@ const Index = () => {
       <AuthoritySection />
       <ProcessSection />
       <FooterCTA />
+      <ChatWidget />
     </div>
   );
 };
