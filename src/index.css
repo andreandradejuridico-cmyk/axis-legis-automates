@@ -36,17 +36,23 @@
 
     --radius: 0.375rem;
 
-    --bronze: 35 50% 45%;
-    --bronze-light: 35 40% 60%;
-    --bronze-glow: 35 55% 55%;
-    --navy: 220 60% 15%;
-    --navy-light: 220 45% 25%;
+    --bronze: 42 65% 52%;
+    --bronze-light: 42 55% 68%;
+    --bronze-glow: 42 70% 60%;
+    --navy: 218 45% 22%;
+    --navy-light: 218 35% 32%;
     --charcoal: 220 10% 20%;
+    --silver: 220 8% 72%;
+    --silver-light: 220 10% 85%;
+    --silver-dark: 220 8% 55%;
+    --steel: 218 12% 42%;
 
     --font-serif: 'Playfair Display', Georgia, serif;
     --font-sans: 'Inter', system-ui, sans-serif;
 
-    --gradient-bronze: linear-gradient(135deg, hsl(35 50% 45%), hsl(35 55% 55%));
+    --gradient-bronze: linear-gradient(135deg, hsl(42 65% 48%), hsl(42 75% 62%));
+    --gradient-silver: linear-gradient(135deg, hsl(220 10% 85%), hsl(220 8% 60%));
+    --gradient-steel: linear-gradient(180deg, hsl(218 15% 35%), hsl(220 10% 55%));
     --gradient-navy: linear-gradient(180deg, hsl(220 60% 12%), hsl(220 50% 20%));
     --shadow-premium: 0 20px 60px -15px hsl(220 60% 15% / 0.15);
     --shadow-card: 0 4px 24px -4px hsl(220 60% 15% / 0.08);
