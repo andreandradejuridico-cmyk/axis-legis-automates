@@ -121,6 +121,30 @@ export type Database = {
           },
         ]
       }
+      contact_messages: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          message: string | null
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          message?: string | null
+          name: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          message?: string | null
+          name?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
