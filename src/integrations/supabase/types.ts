@@ -14,16 +14,182 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ai_agent_config: {
+        Row: {
+          agent_name: string
+          created_at: string
+          enabled: boolean
+          id: string
+          model: string
+          system_prompt: string
+          temperature: number
+          updated_at: string
+          welcome_message: string
+        }
+        Insert: {
+          agent_name?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          model?: string
+          system_prompt?: string
+          temperature?: number
+          updated_at?: string
+          welcome_message?: string
+        }
+        Update: {
+          agent_name?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          model?: string
+          system_prompt?: string
+          temperature?: number
+          updated_at?: string
+          welcome_message?: string
+        }
+        Relationships: []
+      }
+      chat_conversations: {
+        Row: {
+          channel: string
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string
+          id: string
+          metadata: Json | null
+          session_id: string
+          updated_at: string
+        }
+        Insert: {
+          channel?: string
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          session_id: string
+          updated_at?: string
+        }
+        Update: {
+          channel?: string
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          session_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      chat_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          role: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          role: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "chat_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      whatsapp_settings: {
+        Row: {
+          connected: boolean
+          created_at: string
+          default_number: string | null
+          id: string
+          instance_name: string | null
+          last_status_check: string | null
+          updated_at: string
+          webhook_secret: string | null
+        }
+        Insert: {
+          connected?: boolean
+          created_at?: string
+          default_number?: string | null
+          id?: string
+          instance_name?: string | null
+          last_status_check?: string | null
+          updated_at?: string
+          webhook_secret?: string | null
+        }
+        Update: {
+          connected?: boolean
+          created_at?: string
+          default_number?: string | null
+          id?: string
+          instance_name?: string | null
+          last_status_check?: string | null
+          updated_at?: string
+          webhook_secret?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +316,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const
