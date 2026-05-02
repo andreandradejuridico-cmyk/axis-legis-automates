@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import logo from "@/assets/logo-axis-legis.jpg";
+import logo from "@/assets/logo-mark.png";
 
 const Header = () => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
     <motion.header
-      className="fixed top-0 left-0 right-0 z-50 bg-primary/95 backdrop-blur-md border-b border-bronze/10"
+      className="fixed top-0 left-0 right-0 z-50 bg-primary/95 backdrop-blur-md border-b border-silver/10"
       initial={{ y: -80 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.6, ease: "easeOut" }}
@@ -18,11 +18,11 @@ const Header = () => {
           <img
             src={logo}
             alt="Axis Legis"
-            className="h-10 w-10 object-contain rounded-full"
+            className="h-11 w-11 object-contain drop-shadow-[0_2px_8px_rgba(192,196,204,0.25)]"
           />
-          <div className="flex items-center gap-1">
-            <span className="text-2xl font-sans font-bold tracking-tight text-bronze-light">Axis</span>
-            <span className="text-2xl font-serif font-bold tracking-tight text-primary-foreground">Legis</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-2xl font-sans font-bold tracking-tight text-silver-light">Axis</span>
+            <span className="text-2xl font-serif font-bold tracking-tight text-bronze-light">Legis</span>
           </div>
         </a>
 
