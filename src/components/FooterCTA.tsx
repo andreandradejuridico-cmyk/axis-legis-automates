@@ -76,8 +76,8 @@ const FooterCTA = () => {
             rows={4}
             className="bg-primary-foreground/5 border-bronze/20 text-primary-foreground placeholder:text-primary-foreground/30 focus:border-bronze/50 resize-none"
           />
-          <Button variant="hero" size="lg" className="w-full">
-            Solicitar Demonstração
+          <Button variant="hero" size="lg" className="w-full" disabled={loading}>
+            {loading ? "Enviando..." : "Solicitar Demonstração"}
           </Button>
         </motion.form>
 
