@@ -6,6 +6,7 @@ import AuthoritySection from "@/components/AuthoritySection";
 import ProcessSection from "@/components/ProcessSection";
 import FooterCTA from "@/components/FooterCTA";
 import ChatWidget from "@/components/ChatWidget";
+import WhatsAppButton from "@/components/WhatsAppButton";
 
 const Index = () => {
   return (
@@ -18,6 +19,7 @@ const Index = () => {
       <ProcessSection />
       <FooterCTA />
       <ChatWidget />
+      <WhatsAppButton />
     </div>
   );
 };
