@@ -13,12 +13,12 @@ const Header = () => {
       animate={{ y: 0 }}
       transition={{ duration: 0.6, ease: "easeOut" }}
     >
-      <div className="container mx-auto px-6 h-20 flex items-center justify-between">
-        <a href="#" className="flex items-center" aria-label="Axis Legis">
+      <div className="container mx-auto px-6 h-24 md:h-28 flex items-center justify-between">
+        <a href="#" className="flex items-center -my-4" aria-label="Axis Legis">
           <img
             src={logo}
             alt="Axis Legis"
-            className="h-14 md:h-16 w-auto object-contain drop-shadow-[0_2px_12px_rgba(192,196,204,0.25)]"
+            className="h-28 md:h-36 w-auto object-contain drop-shadow-[0_2px_12px_rgba(192,196,204,0.25)]"
           />
         </a>
 
