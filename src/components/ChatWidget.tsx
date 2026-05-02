@@ -71,13 +71,27 @@ const ChatWidget = () => {
     <>
       <motion.button
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-40 h-14 w-14 rounded-full bg-bronze text-accent-foreground shadow-bronze flex items-center justify-center hover:bg-bronze-glow transition-colors"
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-3 pl-5 pr-6 py-4 rounded-full bg-bronze text-accent-foreground shadow-bronze font-sans font-semibold hover:bg-bronze-glow"
         initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: open ? 0 : 1, opacity: open ? 0 : 1 }}
-        transition={{ type: "spring", stiffness: 260, damping: 20 }}
-        aria-label="Abrir chat"
+        animate={{
+          scale: open ? 0 : [1, 1.06, 1],
+          opacity: open ? 0 : 1,
+        }}
+        transition={{
+          scale: open
+            ? { type: "spring", stiffness: 260, damping: 20 }
+            : { duration: 2, repeat: Infinity, ease: "easeInOut" },
+          opacity: { duration: 0.4 },
+        }}
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.95 }}
+        aria-label="Abrir chat com atendente virtual"
       >
-        <MessageCircle size={24} />
+        <span className="relative flex h-12 w-12 items-center justify-center">
+          <span className="absolute inset-0 rounded-full bg-bronze-light/40 animate-ping" />
+          <MessageCircle size={28} className="relative" />
+        </span>
+        <span className="hidden sm:inline text-sm tracking-wide uppercase">Atendente Virtual</span>
       </motion.button>
 
       <AnimatePresence>
