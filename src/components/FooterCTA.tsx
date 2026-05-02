@@ -4,12 +4,25 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { supabase } from "@/integrations/supabase/client";
 
 const FooterCTA = () => {
   const [form, setForm] = useState({ name: "", email: "", message: "" });
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
+    const { error } = await supabase.from("contact_messages").insert({
+      name: form.name,
+      email: form.email,
+      message: form.message || null,
+    });
+    setLoading(false);
+    if (error) {
+      toast.error("Não foi possível enviar. Tente novamente.");
+      return;
+    }
     toast.success("Mensagem enviada com sucesso. Entraremos em contato em breve.");
     setForm({ name: "", email: "", message: "" });
   };
@@ -63,8 +76,8 @@ const FooterCTA = () => {
             rows={4}
             className="bg-primary-foreground/5 border-bronze/20 text-primary-foreground placeholder:text-primary-foreground/30 focus:border-bronze/50 resize-none"
           />
-          <Button variant="hero" size="lg" className="w-full">
-            Solicitar Demonstração
+          <Button variant="hero" size="lg" className="w-full" disabled={loading}>
+            {loading ? "Enviando..." : "Solicitar Demonstração"}
           </Button>
         </motion.form>
 
