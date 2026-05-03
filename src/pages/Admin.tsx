@@ -45,6 +45,7 @@ const Admin = () => {
   const [conversations, setConversations] = useState<Conv[]>([]);
 
   const [isAdmin, setIsAdmin] = useState(false);
+  const [users, setUsers] = useState<any[]>([]);
 
   const load = async () => {
     setLoading(true);
@@ -62,6 +63,11 @@ const Admin = () => {
         .maybeSingle();
       adminCheck = !!roleData;
       setIsAdmin(adminCheck);
+      
+      if (adminCheck) {
+        const { data: usersData } = await supabase.rpc('get_all_users');
+        if (usersData) setUsers(usersData);
+      }
     }
 
     const [a, w, c] = await Promise.all([
@@ -78,6 +84,17 @@ const Admin = () => {
   useEffect(() => {
     load();
   }, []);
+
+  const toggleUserRole = async (userId: string, currentRole: string) => {
+    const newRole = currentRole === 'admin' ? 'user' : 'admin';
+    const { error } = await supabase.rpc('set_user_role', { target_user_id: userId, new_role: newRole });
+    if (error) {
+      toast.error("Erro ao alterar permissão: " + error.message);
+      return;
+    }
+    toast.success("Permissão alterada com sucesso!");
+    setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
+  };
 
   const saveAgent = async () => {
     if (!agent) return;
@@ -248,6 +265,43 @@ const Admin = () => {
               <Button onClick={saveWa} disabled={saving} variant="hero">
                 {saving ? <Loader2 className="animate-spin" /> : "Salvar WhatsApp"}
               </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {isAdmin && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 font-serif">
+                Painel de Permissões
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="divide-y">
+                {users.map((u) => (
+                  <div key={u.id} className="py-3 flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-sm">{u.email}</p>
+                      <p className="text-xs text-muted-foreground">ID: {u.id}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-mono bg-muted px-2 py-1 rounded">
+                        {u.role === "admin" ? "Admin" : "Atendente"}
+                      </span>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => toggleUserRole(u.id, u.role)}
+                      >
+                        {u.role === "admin" ? "Remover Admin" : "Tornar Admin"}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                {users.length === 0 && (
+                  <p className="text-sm text-muted-foreground">Nenhum usuário encontrado.</p>
+                )}
+              </div>
             </CardContent>
           </Card>
         )}
