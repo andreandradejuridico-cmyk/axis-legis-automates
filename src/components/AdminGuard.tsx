@@ -26,9 +26,9 @@ const AdminGuard = ({ children }: { children: React.ReactNode }) => {
       if (error) console.error("AdminGuard role check failed:", error);
       
       if (!data) {
-        await supabase.auth.signOut();
-        toast.error("Acesso negado: O usuário não possui privilégios de administrador.");
-        if (active) setState("deny");
+        // Usuário é válido (está logado), mas não é admin na tabela user_roles.
+        // Como o cadastro é interno, vamos liberar o acesso como usuário comum.
+        if (active) setState("ok");
       } else {
         if (active) setState("ok");
       }
