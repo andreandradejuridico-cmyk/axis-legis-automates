@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 const AdminGuard = ({ children }: { children: React.ReactNode }) => {
   const [state, setState] = useState<"loading" | "ok" | "deny">("loading");
@@ -23,7 +24,14 @@ const AdminGuard = ({ children }: { children: React.ReactNode }) => {
         .maybeSingle();
       if (!active) return;
       if (error) console.error("AdminGuard role check failed:", error);
-      setState(data ? "ok" : "deny");
+      
+      if (!data) {
+        await supabase.auth.signOut();
+        toast.error("Acesso negado: O usuário não possui privilégios de administrador.");
+        if (active) setState("deny");
+      } else {
+        if (active) setState("ok");
+      }
     };
 
     // Set up listener FIRST. Defer supabase calls with setTimeout to avoid deadlock.
