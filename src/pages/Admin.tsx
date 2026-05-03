@@ -7,9 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Loader2, LogOut, MessageSquare, Bot, Smartphone, Users } from "lucide-react";
+import { Loader2, LogOut, MessageSquare, Bot, Smartphone, Users, LayoutDashboard, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -59,6 +58,8 @@ const Admin = () => {
 
   const [isAdmin, setIsAdmin] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
+
+  const [activeSection, setActiveSection] = useState("overview");
 
   const load = async () => {
     setLoading(true);
@@ -168,171 +169,301 @@ const Admin = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-charcoal text-silver">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="animate-spin text-bronze" size={32} />
+          <p className="tracking-widest uppercase text-xs">Carregando painel...</p>
+        </div>
       </div>
     );
   }
 
+  const navItems = [
+    { id: "overview", icon: LayoutDashboard, label: "Visão Geral", show: true },
+    { id: "conversations", icon: MessageSquare, label: "Conversas", show: true },
+    { id: "agent", icon: Bot, label: "Agente IA", show: isAdmin && !!agent },
+    { id: "whatsapp", icon: Smartphone, label: "WhatsApp", show: isAdmin && !!wa },
+    { id: "users", icon: Users, label: "Permissões", show: isAdmin },
+  ];
+
   return (
-    <div className="min-h-screen bg-background">
-      <header className="bg-navy-gradient text-primary-foreground">
-        <div className="container mx-auto px-6 py-6 flex items-center justify-between">
-          <div>
-            <p className="text-bronze-light text-xs tracking-[0.3em] uppercase">Axis Legis</p>
-            <h1 className="font-serif text-2xl">Painel Administrativo</h1>
-          </div>
-          <Button variant="hero-outline" onClick={logout}>
-            <LogOut size={16} className="mr-2" /> Sair
-          </Button>
+    <div className="flex h-screen bg-[#1a1c23] text-silver-light overflow-hidden font-sans">
+      
+      {/* Sidebar Elegante */}
+      <aside className="w-72 flex flex-col border-r border-white/5 z-20">
+        <div className="p-8">
+          <h1 className="font-serif text-3xl text-white tracking-wide">Axis<span className="text-bronze">Legis</span></h1>
+          <p className="text-[10px] text-silver-dark tracking-[0.3em] uppercase mt-2">Boutique Jurídica</p>
         </div>
-      </header>
-
-      <main className="container mx-auto px-6 py-10 max-w-6xl">
-        <Tabs defaultValue="conversations" className="space-y-6">
-          <TabsList className="bg-muted/50 p-1">
-            <TabsTrigger value="conversations" className="flex gap-2">
-              <MessageSquare size={16} /> Conversas
-            </TabsTrigger>
-            {isAdmin && agent && (
-              <TabsTrigger value="agent" className="flex gap-2">
-                <Bot size={16} /> Agente de IA
-              </TabsTrigger>
-            )}
-            {isAdmin && wa && (
-              <TabsTrigger value="whatsapp" className="flex gap-2">
-                <Smartphone size={16} /> WhatsApp
-              </TabsTrigger>
-            )}
-            {isAdmin && (
-              <TabsTrigger value="users" className="flex gap-2">
-                <Users size={16} /> Permissões
-              </TabsTrigger>
-            )}
-          </TabsList>
-
-          <TabsContent value="conversations" className="focus-visible:outline-none">
-            <Card className="border-bronze/10 shadow-sm">
-              <CardHeader className="bg-muted/30">
-                <CardTitle className="flex items-center gap-2 font-serif text-xl">
-                  <MessageSquare size={20} className="text-bronze" /> Conversas Recentes
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                {conversations.length === 0 ? (
-                  <div className="p-8 text-center text-muted-foreground">
-                    <p>Nenhuma conversa registrada ainda.</p>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-border/50">
-                    {conversations.map((c) => (
-                      <div key={c.id} className="p-4 hover:bg-muted/30 transition-colors flex items-center justify-between">
-                        <div>
-                          <p className="font-medium text-foreground">{c.contact_name || c.contact_phone || c.session_id}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Canal: <span className="uppercase font-mono text-[10px]">{c.channel}</span> · {new Date(c.created_at).toLocaleString("pt-BR")}
-                          </p>
-                        </div>
-                        <Button variant="outline" size="sm" className="hidden sm:flex" onClick={() => viewHistory(c)}>
-                          Ver Histórico
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
+        
+        <nav className="flex-1 px-4 space-y-1.5 mt-4">
+          {navItems.filter(item => item.show).map((item) => {
+            const isActive = activeSection === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveSection(item.id)}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 relative overflow-hidden group
+                  ${isActive 
+                    ? 'text-white bg-white/10 font-medium' 
+                    : 'text-silver hover:text-white hover:bg-white/5'
+                  }`}
+              >
+                {isActive && (
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-bronze rounded-r-md"></div>
                 )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+                <item.icon size={18} className={isActive ? 'text-bronze' : 'text-silver-dark group-hover:text-silver'} />
+                <span>{item.label}</span>
+              </button>
+            )
+          })}
+        </nav>
 
-          <Dialog open={!!selectedConv} onOpenChange={(o) => !o && setSelectedConv(null)}>
-            <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
-              <DialogHeader>
-                <DialogTitle>Histórico de Conversa</DialogTitle>
-              </DialogHeader>
-              <div className="flex-1 overflow-y-auto space-y-4 p-4 border rounded-md bg-muted/10">
-                {loadingMessages ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="animate-spin text-bronze" />
-                  </div>
-                ) : chatMessages.length === 0 ? (
-                  <p className="text-center text-muted-foreground text-sm py-8">Nenhuma mensagem encontrada nesta conversa.</p>
-                ) : (
-                  chatMessages.map(msg => (
-                    <div key={msg.id} className={`flex flex-col max-w-[80%] ${msg.role === 'user' ? 'ml-auto items-end' : 'mr-auto items-start'}`}>
-                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1 px-1">
-                        {msg.role === 'user' ? 'Cliente' : 'Agente IA'}
-                      </span>
-                      <div className={`p-3 rounded-lg text-sm ${msg.role === 'user' ? 'bg-bronze text-accent-foreground' : 'bg-primary-foreground/10 text-primary-foreground'}`}>
-                        {msg.content}
-                      </div>
+        <div className="p-6 border-t border-white/5">
+          <button 
+            onClick={logout}
+            className="flex items-center gap-3 w-full px-4 py-3 text-sm text-silver-dark hover:text-white hover:bg-white/5 rounded-xl transition-colors"
+          >
+            <LogOut size={16} /> Sair do Sistema
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content Area (Glassmorphism / Premium Look) */}
+      <main className="flex-1 bg-background text-foreground flex flex-col relative z-10 shadow-[-20px_0_40px_rgba(0,0,0,0.4)] rounded-tl-3xl overflow-hidden m-2 ml-0 border border-white/10">
+        
+        {/* Header Title */}
+        <header className="h-24 border-b border-border/50 flex items-center justify-between px-10 bg-card/80 backdrop-blur-md sticky top-0 z-10">
+           <h2 className="text-2xl font-serif text-navy tracking-tight">
+             {navItems.find(i => i.id === activeSection)?.label}
+           </h2>
+           <div className="flex items-center gap-3">
+             <div className="w-8 h-8 rounded-full bg-bronze/20 flex items-center justify-center border border-bronze/30">
+                <Users size={14} className="text-bronze-charcoal" />
+             </div>
+             <span className="text-sm font-medium text-muted-foreground">{isAdmin ? 'Administrador' : 'Atendente'}</span>
+           </div>
+        </header>
+
+        {/* Scrollable Content Area */}
+        <div className="flex-1 overflow-y-auto p-10 relative">
+          
+          {/* SECTION: VISÃO GERAL */}
+          {activeSection === "overview" && (
+            <div className="space-y-8 animate-fade-in">
+              <div className="bg-gradient-to-br from-[#1a1c23] to-[#2c303a] p-10 rounded-3xl text-white shadow-premium relative overflow-hidden border border-white/10">
+                <div className="relative z-10">
+                  <h2 className="font-serif text-4xl mb-3 text-white">Painel de Controle</h2>
+                  <p className="text-silver max-w-xl leading-relaxed text-sm">
+                    Acompanhe em tempo real as conversas ativas, configure as respostas automáticas da sua IA e verifique a saúde das conexões de mensageria.
+                  </p>
+                </div>
+                <div className="absolute -right-10 -bottom-10 opacity-5 pointer-events-none">
+                   <Bot size={280} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <Card className="shadow-card border-border/50 bg-card/50 backdrop-blur-sm rounded-2xl">
+                  <CardContent className="p-6">
+                    <div className="flex justify-between items-start">
+                       <div>
+                         <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Conversas Registradas</p>
+                         <h3 className="text-4xl font-bold mt-2 text-navy">{conversations.length}</h3>
+                       </div>
+                       <div className="p-4 bg-bronze/10 rounded-2xl text-bronze"><MessageSquare size={24} /></div>
                     </div>
-                  ))
+                  </CardContent>
+                </Card>
+                
+                {isAdmin && agent && (
+                <Card className="shadow-card border-border/50 bg-card/50 backdrop-blur-sm rounded-2xl">
+                  <CardContent className="p-6">
+                    <div className="flex justify-between items-start">
+                       <div>
+                         <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Status do Agente IA</p>
+                         <h3 className="text-2xl font-bold mt-4 flex items-center gap-2">
+                           {agent.enabled 
+                             ? <><span className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></span> <span className="text-green-600">Ativo no site</span></> 
+                             : <><span className="w-3 h-3 rounded-full bg-red-500"></span> <span className="text-muted-foreground">Pausado</span></>}
+                         </h3>
+                       </div>
+                       <div className="p-4 bg-charcoal/5 rounded-2xl text-charcoal"><Bot size={24} /></div>
+                    </div>
+                  </CardContent>
+                </Card>
+                )}
+
+                {isAdmin && wa && (
+                <Card className="shadow-card border-border/50 bg-card/50 backdrop-blur-sm rounded-2xl">
+                  <CardContent className="p-6">
+                    <div className="flex justify-between items-start">
+                       <div>
+                         <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Conexão WhatsApp</p>
+                         <h3 className="text-2xl font-bold mt-4 flex items-center gap-2">
+                           {wa.connected 
+                             ? <><span className="text-green-600">Online</span></> 
+                             : <><span className="text-red-500">Offline</span></>}
+                         </h3>
+                       </div>
+                       <div className="p-4 bg-charcoal/5 rounded-2xl text-charcoal"><Smartphone size={24} /></div>
+                    </div>
+                  </CardContent>
+                </Card>
                 )}
               </div>
-            </DialogContent>
-          </Dialog>
+            </div>
+          )}
 
-          {isAdmin && agent && (
-            <TabsContent value="agent" className="focus-visible:outline-none">
-              <Card className="border-bronze/10 shadow-sm">
-                <CardHeader className="bg-muted/30">
-                  <CardTitle className="flex items-center justify-between font-serif text-xl">
-                    <div className="flex items-center gap-2">
-                      <Bot size={20} className="text-bronze" /> Configuração do Agente IA
+          {/* SECTION: CONVERSAS */}
+          {activeSection === "conversations" && (
+            <div className="animate-fade-in">
+              <Card className="border-border/50 shadow-card rounded-2xl overflow-hidden bg-card/50 backdrop-blur-sm">
+                <CardContent className="p-0">
+                  {conversations.length === 0 ? (
+                    <div className="p-16 text-center text-muted-foreground flex flex-col items-center">
+                      <MessageSquare size={48} className="opacity-20 mb-4" />
+                      <p className="text-lg">Nenhuma conversa registrada ainda.</p>
+                      <p className="text-sm mt-1">As interações dos usuários com a IA aparecerão aqui.</p>
                     </div>
-                    <div className="flex items-center gap-3 text-sm font-sans font-normal">
-                      <Label htmlFor="agent-active" className="cursor-pointer">Ativo no site</Label>
+                  ) : (
+                    <div className="divide-y divide-border/50">
+                      {conversations.map((c) => (
+                        <div key={c.id} className="p-6 hover:bg-muted/50 transition-colors flex items-center justify-between group">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-full bg-navy/5 flex items-center justify-center text-navy font-serif font-bold">
+                              {c.contact_name ? c.contact_name.charAt(0).toUpperCase() : 'A'}
+                            </div>
+                            <div>
+                              <p className="font-semibold text-foreground text-lg">{c.contact_name || c.contact_phone || "Visitante Anônimo"}</p>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                                <span className="uppercase font-mono tracking-wider bg-muted px-2 py-0.5 rounded-md text-[10px]">{c.channel}</span> 
+                                <span>{new Date(c.created_at).toLocaleString("pt-BR")}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <Button 
+                            variant="outline" 
+                            className="opacity-0 group-hover:opacity-100 transition-opacity rounded-full px-6 border-border" 
+                            onClick={() => viewHistory(c)}
+                          >
+                            Ler Transcrição <ChevronRight size={14} className="ml-1" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Modal de Histórico */}
+              <Dialog open={!!selectedConv} onOpenChange={(o) => !o && setSelectedConv(null)}>
+                <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 overflow-hidden border-border/50 shadow-premium">
+                  <DialogHeader className="p-6 pb-4 border-b border-border/50 bg-muted/20">
+                    <DialogTitle className="font-serif text-xl text-navy">
+                      Transcrição da Conversa
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-[#f8f9fa]">
+                    {loadingMessages ? (
+                      <div className="flex items-center justify-center py-20">
+                        <Loader2 className="animate-spin text-bronze" size={32} />
+                      </div>
+                    ) : chatMessages.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-20">Nenhuma mensagem salva para esta sessão.</p>
+                    ) : (
+                      chatMessages.map(msg => (
+                        <div key={msg.id} className={`flex flex-col w-fit max-w-[85%] ${msg.role === 'user' ? 'ml-auto items-end' : 'mr-auto items-start'}`}>
+                          <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest mb-1.5 px-1">
+                            {msg.role === 'user' ? 'Cliente' : 'Axis Legis IA'}
+                          </span>
+                          <div className={`p-4 rounded-2xl text-[15px] leading-relaxed shadow-sm ${
+                            msg.role === 'user' 
+                            ? 'bg-[#1a1c23] text-white rounded-tr-sm' 
+                            : 'bg-white border border-border/50 text-foreground rounded-tl-sm'
+                          }`}>
+                            {msg.content}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          )}
+
+          {/* SECTION: AGENTE IA */}
+          {activeSection === "agent" && isAdmin && agent && (
+            <div className="animate-fade-in max-w-4xl">
+              <Card className="border-border/50 shadow-card rounded-2xl bg-card/50 backdrop-blur-sm">
+                <CardContent className="p-8 grid gap-8">
+                  
+                  <div className="flex items-center justify-between pb-6 border-b border-border/50">
+                    <div>
+                      <h3 className="text-lg font-serif text-navy">Controle de Status</h3>
+                      <p className="text-sm text-muted-foreground">Ative ou pause as respostas automáticas da inteligência artificial.</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Label htmlFor="agent-active" className="font-medium cursor-pointer">Visível no Site</Label>
                       <Switch
                         id="agent-active"
                         checked={agent.enabled}
                         onCheckedChange={(v) => setAgent({ ...agent, enabled: v })}
+                        className="data-[state=checked]:bg-green-500"
                       />
                     </div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6 grid gap-6">
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label>Nome do Agente</Label>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-8">
+                    <div className="space-y-3">
+                      <Label className="text-muted-foreground font-medium uppercase tracking-wider text-xs">Nome de Exibição</Label>
                       <Input
                         value={agent.agent_name}
                         onChange={(e) => setAgent({ ...agent, agent_name: e.target.value })}
-                        className="bg-background"
+                        className="bg-background h-12 rounded-xl border-border"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label>Modelo de IA</Label>
+                    <div className="space-y-3">
+                      <Label className="text-muted-foreground font-medium uppercase tracking-wider text-xs">Motor de IA</Label>
                       <Input
                         value={agent.model}
                         onChange={(e) => setAgent({ ...agent, model: e.target.value })}
                         placeholder="google/gemini-2.5-flash"
-                        className="bg-background font-mono text-sm"
+                        className="bg-background font-mono text-sm h-12 rounded-xl border-border"
                       />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Mensagem de Boas-vindas</Label>
+                  
+                  <div className="space-y-3">
+                    <Label className="text-muted-foreground font-medium uppercase tracking-wider text-xs">Mensagem de Boas-vindas</Label>
                     <Textarea
                       value={agent.welcome_message}
                       onChange={(e) => setAgent({ ...agent, welcome_message: e.target.value })}
                       rows={2}
-                      className="resize-none bg-background"
+                      className="resize-none bg-background rounded-xl border-border p-4"
                     />
-                    <p className="text-xs text-muted-foreground">A primeira mensagem enviada pelo bot ao iniciar um novo atendimento.</p>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Prompt do Sistema (Comportamento)</Label>
+                  
+                  <div className="space-y-3">
+                    <Label className="text-muted-foreground font-medium uppercase tracking-wider text-xs flex justify-between">
+                      <span>Prompt do Sistema (Diretrizes)</span>
+                    </Label>
                     <Textarea
                       value={agent.system_prompt}
                       onChange={(e) => setAgent({ ...agent, system_prompt: e.target.value })}
-                      rows={8}
-                      className="bg-background font-mono text-sm leading-relaxed"
+                      rows={10}
+                      className="bg-background font-mono text-sm leading-relaxed rounded-xl border-border p-4 shadow-inner"
                     />
                   </div>
-                  <div className="space-y-4 pt-2">
+                  
+                  <div className="space-y-6 pt-4 bg-muted/30 p-6 rounded-2xl border border-border/50">
                     <div className="flex justify-between items-center">
-                      <Label>Temperatura (Criatividade)</Label>
-                      <span className="text-sm font-mono font-medium text-bronze bg-bronze/10 px-2 py-0.5 rounded">
+                      <div>
+                        <Label className="text-navy font-medium">Temperatura (Nível de Criatividade)</Label>
+                        <p className="text-xs text-muted-foreground mt-1">Controla o quão determinísticas ou criativas as respostas serão.</p>
+                      </div>
+                      <span className="text-xl font-mono font-bold text-charcoal bg-white shadow-sm px-4 py-1.5 rounded-lg border border-border">
                         {agent.temperature.toFixed(1)}
                       </span>
                     </div>
@@ -342,66 +473,65 @@ const Admin = () => {
                       max={2}
                       step={0.1}
                       onValueChange={([v]) => setAgent({ ...agent, temperature: v })}
-                      className="py-4"
+                      className="py-2"
                     />
-                    <p className="text-xs text-muted-foreground flex justify-between">
-                      <span>Mais conservador (0.0)</span>
-                      <span>Mais criativo (2.0)</span>
-                    </p>
                   </div>
-                  <div className="pt-4 border-t border-border/50">
-                    <Button onClick={saveAgent} disabled={saving} variant="hero" className="w-full sm:w-auto">
-                      {saving ? <Loader2 className="animate-spin mr-2" /> : <Bot size={16} className="mr-2" />}
-                      Salvar Configurações do Agente
+                  
+                  <div className="pt-6">
+                    <Button onClick={saveAgent} disabled={saving} className="bg-charcoal hover:bg-navy text-white px-8 h-12 rounded-xl shadow-md w-full sm:w-auto transition-all">
+                      {saving ? <Loader2 className="animate-spin mr-2" /> : <Bot size={18} className="mr-2" />}
+                      Salvar Alterações do Agente
                     </Button>
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </div>
           )}
 
-          {isAdmin && wa && (
-            <TabsContent value="whatsapp" className="focus-visible:outline-none">
-              <Card className="border-bronze/10 shadow-sm">
-                <CardHeader className="bg-muted/30">
-                  <CardTitle className="flex items-center gap-2 font-serif text-xl">
-                    <Smartphone size={20} className="text-bronze" /> WhatsApp (Evolution API)
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6 grid gap-6">
-                  <div className="bg-muted/50 border border-border rounded-lg p-4 text-sm text-muted-foreground">
-                    <p>
-                      <strong>Nota de Segurança:</strong> As credenciais principais (URL da Evolution API, API Key e Nome real da Instância) 
-                      são configuradas diretamente no servidor (Variáveis de Ambiente / Secrets) para evitar exposição no painel web.
+          {/* SECTION: WHATSAPP */}
+          {activeSection === "whatsapp" && isAdmin && wa && (
+            <div className="animate-fade-in max-w-4xl">
+              <Card className="border-border/50 shadow-card rounded-2xl bg-card/50 backdrop-blur-sm overflow-hidden">
+                <div className="h-1 bg-gradient-to-r from-green-400 to-green-600"></div>
+                <CardContent className="p-8 grid gap-8">
+                  
+                  <div className="bg-charcoal/5 border border-charcoal/10 rounded-xl p-5 text-sm text-charcoal">
+                    <p className="flex gap-3 items-start">
+                      <span className="bg-charcoal text-white rounded-full w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">!</span>
+                      <span>
+                        <strong>Arquitetura de Segurança:</strong> As credenciais do WhatsApp (URL do Evolution, API Key) estão armazenadas de forma encriptada no cofre do servidor (Environment Secrets) e nunca transitam para esta interface web.
+                      </span>
                     </p>
                   </div>
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label>Nome de Referência</Label>
+
+                  <div className="grid md:grid-cols-2 gap-8">
+                    <div className="space-y-3">
+                      <Label className="text-muted-foreground font-medium uppercase tracking-wider text-xs">Identificador da Instância</Label>
                       <Input
                         value={wa.instance_name ?? ""}
                         onChange={(e) => setWa({ ...wa, instance_name: e.target.value })}
-                        className="bg-background"
+                        className="bg-background h-12 rounded-xl"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label>Número Padrão (Fallback)</Label>
+                    <div className="space-y-3">
+                      <Label className="text-muted-foreground font-medium uppercase tracking-wider text-xs">Número Padrão (DDI+DDD+Num)</Label>
                       <Input
                         value={wa.default_number ?? ""}
                         onChange={(e) => setWa({ ...wa, default_number: e.target.value })}
                         placeholder="5511999999999"
-                        className="bg-background"
+                        className="bg-background h-12 rounded-xl font-mono"
                       />
                     </div>
                   </div>
-                  <div className="flex items-center justify-between bg-background border border-border p-4 rounded-lg">
+
+                  <div className="flex items-center justify-between bg-white border border-border shadow-sm p-6 rounded-xl">
                     <div>
-                      <Label className="text-base">Status da Conexão</Label>
-                      <p className="text-xs text-muted-foreground mt-1">Indica se o QR Code foi lido e a instância está operante.</p>
+                      <Label className="text-lg font-serif text-navy">Sincronização de Conexão</Label>
+                      <p className="text-sm text-muted-foreground mt-1 max-w-sm">Determine se o robô deve processar mensagens ou se o WhatsApp está desconectado na fonte.</p>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`text-xs font-medium uppercase tracking-wide px-2 py-1 rounded-full ${wa.connected ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                        {wa.connected ? 'Conectado' : 'Desconectado'}
+                    <div className="flex items-center gap-4">
+                      <span className={`text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-md ${wa.connected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {wa.connected ? 'Serviço Ativo' : 'Offline'}
                       </span>
                       <Switch
                         checked={wa.connected}
@@ -409,65 +539,74 @@ const Admin = () => {
                       />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Webhook Configurado na Evolution</Label>
-                    <div className="bg-muted p-3 rounded-md text-xs font-mono break-all border border-border/50">
+
+                  <div className="space-y-3">
+                    <Label className="text-muted-foreground font-medium uppercase tracking-wider text-xs">Endpoint do Webhook (Somente Leitura)</Label>
+                    <div className="bg-[#1a1c23] text-silver p-4 rounded-xl text-sm font-mono break-all border border-[#2c303a] shadow-inner select-all">
                       {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-webhook`}
                     </div>
                   </div>
-                  <div className="pt-4 border-t border-border/50">
-                    <Button onClick={saveWa} disabled={saving} variant="hero" className="w-full sm:w-auto">
-                      {saving ? <Loader2 className="animate-spin mr-2" /> : <Smartphone size={16} className="mr-2" />}
-                      Salvar Configurações do WhatsApp
+
+                  <div className="pt-6">
+                    <Button onClick={saveWa} disabled={saving} className="bg-charcoal hover:bg-navy text-white px-8 h-12 rounded-xl shadow-md w-full sm:w-auto transition-all">
+                      {saving ? <Loader2 className="animate-spin mr-2" /> : <Smartphone size={18} className="mr-2" />}
+                      Atualizar Parâmetros do WhatsApp
                     </Button>
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </div>
           )}
 
-          {isAdmin && (
-            <TabsContent value="users" className="focus-visible:outline-none">
-              <Card className="border-bronze/10 shadow-sm">
-                <CardHeader className="bg-muted/30">
-                  <CardTitle className="flex items-center gap-2 font-serif text-xl">
-                    <Users size={20} className="text-bronze" /> Gestão de Acessos
-                  </CardTitle>
-                </CardHeader>
+          {/* SECTION: USERS */}
+          {activeSection === "users" && isAdmin && (
+            <div className="animate-fade-in max-w-4xl">
+              <Card className="border-border/50 shadow-card rounded-2xl bg-card/50 backdrop-blur-sm">
                 <CardContent className="p-0">
                   <div className="divide-y divide-border/50">
                     {users.map((u) => (
-                      <div key={u.id} className="p-4 hover:bg-muted/30 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div>
-                          <p className="font-medium text-foreground">{u.email}</p>
-                          <p className="text-xs text-muted-foreground font-mono mt-1">ID: {u.id}</p>
+                      <div key={u.id} className="p-6 hover:bg-muted/50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-charcoal to-navy flex items-center justify-center text-white font-serif text-xl shadow-md">
+                            {u.email.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-semibold text-foreground">{u.email}</p>
+                            <p className="text-xs text-muted-foreground font-mono mt-1 opacity-70">ID: {u.id}</p>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <span className={`text-xs font-mono px-3 py-1 rounded-full ${u.role === 'admin' ? 'bg-bronze/10 text-bronze border border-bronze/20' : 'bg-muted text-muted-foreground'}`}>
+                        <div className="flex items-center gap-4">
+                          <span className={`text-xs font-bold tracking-wider uppercase px-3 py-1.5 rounded-md ${
+                            u.role === 'admin' 
+                            ? 'bg-charcoal text-white shadow-sm' 
+                            : 'bg-muted border border-border text-muted-foreground'
+                          }`}>
                             {u.role === "admin" ? "Administrador" : "Atendente"}
                           </span>
                           <Button 
                             variant={u.role === "admin" ? "outline" : "default"} 
                             size="sm" 
                             onClick={() => toggleUserRole(u.id, u.role)}
-                            className="min-w-[140px]"
+                            className="min-w-[150px] rounded-lg"
                           >
-                            {u.role === "admin" ? "Remover Admin" : "Tornar Admin"}
+                            {u.role === "admin" ? "Remover Privilégios" : "Promover a Admin"}
                           </Button>
                         </div>
                       </div>
                     ))}
                     {users.length === 0 && (
-                      <div className="p-8 text-center text-muted-foreground">
-                        <p>Nenhum usuário encontrado além de você.</p>
+                      <div className="p-16 text-center text-muted-foreground">
+                        <Users size={48} className="mx-auto opacity-20 mb-4" />
+                        <p className="text-lg">Nenhum outro usuário cadastrado no sistema.</p>
                       </div>
                     )}
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </div>
           )}
-        </Tabs>
+
+        </div>
       </main>
     </div>
   );
