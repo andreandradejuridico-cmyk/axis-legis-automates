@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Loader2, LogOut, MessageSquare, Bot, Smartphone, Users, LayoutDashboard, ChevronRight } from "lucide-react";
+import { Loader2, LogOut, MessageSquare, Bot, Smartphone, Users, LayoutDashboard, ChevronRight, Calendar, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -45,6 +45,26 @@ type ChatMessage = {
   created_at: string;
 };
 
+type Appointment = {
+  id: string;
+  contact_name: string;
+  contact_email: string;
+  contact_phone: string;
+  legal_area: string;
+  subject: string;
+  notes: string | null;
+  appointment_time: string;
+  status: string;
+};
+
+type BusinessHour = {
+  id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  is_closed: boolean;
+};
+
 const Admin = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -52,6 +72,8 @@ const Admin = () => {
   const [agent, setAgent] = useState<AgentCfg | null>(null);
   const [wa, setWa] = useState<WaCfg | null>(null);
   const [conversations, setConversations] = useState<Conv[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [businessHours, setBusinessHours] = useState<BusinessHour[]>([]);
   const [selectedConv, setSelectedConv] = useState<Conv | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -87,10 +109,12 @@ const Admin = () => {
       }
     }
 
-    const [a, w, c] = await Promise.all([
+    const [a, w, c, app, bh] = await Promise.all([
       adminCheck ? supabase.from("ai_agent_config").select("*").order("created_at", { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null, error: null }),
       adminCheck ? supabase.from("whatsapp_settings").select("*").order("created_at", { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null, error: null }),
       supabase.from("chat_conversations").select("*", { count: 'exact' }).order("created_at", { ascending: false }).limit(20),
+      supabase.from("appointments").select("*").order("appointment_time", { ascending: true }),
+      supabase.from("business_hours").select("*").order("day_of_week", { ascending: true }),
     ]);
 
     if (c.error) console.error("Error fetching conversations:", c.error);
@@ -99,6 +123,8 @@ const Admin = () => {
     setAgent(a.data as any);
     setWa(w.data as any);
     setConversations((c.data as any) ?? []);
+    setAppointments((app.data as any) ?? []);
+    setBusinessHours((bh.data as any) ?? []);
     setLoading(false);
   };
 
@@ -169,6 +195,22 @@ const Admin = () => {
     error ? toast.error(error.message) : toast.success("WhatsApp atualizado.");
   };
 
+  const saveBusinessHours = async () => {
+    setSaving(true);
+    const promises = businessHours.map(bh => 
+      supabase.from("business_hours").update({
+        start_time: bh.start_time,
+        end_time: bh.end_time,
+        is_closed: bh.is_closed
+      }).eq("id", bh.id)
+    );
+    await Promise.all(promises);
+    setSaving(false);
+    toast.success("Horários de funcionamento atualizados.");
+  };
+
+  const dayNames = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+
   const logout = async () => {
     await supabase.auth.signOut();
     navigate("/admin/login", { replace: true });
@@ -187,6 +229,8 @@ const Admin = () => {
 
   const navItems = [
     { id: "overview", icon: LayoutDashboard, label: "Visão Geral", show: true },
+    { id: "agenda", icon: Calendar, label: "Agenda", show: true },
+    { id: "hours", icon: Clock, label: "Horários", show: isAdmin },
     { id: "conversations", icon: MessageSquare, label: "Conversas", show: true },
     { id: "agent", icon: Bot, label: "Agente IA", show: isAdmin && !!agent },
     { id: "whatsapp", icon: Smartphone, label: "WhatsApp", show: isAdmin && !!wa },
@@ -319,6 +363,166 @@ const Admin = () => {
                 </Card>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* SECTION: AGENDA */}
+          {activeSection === "agenda" && (
+            <div className="animate-fade-in space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <Card className="bg-navy text-white border-none rounded-2xl shadow-premium overflow-hidden relative">
+                   <CardContent className="p-6">
+                      <p className="text-silver-light text-xs uppercase tracking-widest font-medium">Total de Agendamentos</p>
+                      <h3 className="text-4xl font-serif mt-2">{appointments.length}</h3>
+                      <Calendar className="absolute -right-4 -bottom-4 opacity-10" size={100} />
+                   </CardContent>
+                </Card>
+                <Card className="bg-white border-border/50 rounded-2xl shadow-card">
+                   <CardContent className="p-6">
+                      <p className="text-muted-foreground text-xs uppercase tracking-widest font-medium">Próximo Compromisso</p>
+                      <h3 className="text-xl font-bold mt-2 text-navy">
+                        {appointments.length > 0 
+                          ? new Date(appointments[0].appointment_time).toLocaleDateString("pt-BR")
+                          : "Nenhum"}
+                      </h3>
+                   </CardContent>
+                </Card>
+                <Card className="bg-white border-border/50 rounded-2xl shadow-card">
+                   <CardContent className="p-6">
+                      <p className="text-muted-foreground text-xs uppercase tracking-widest font-medium">Taxa de Conversão</p>
+                      <h3 className="text-xl font-bold mt-2 text-bronze">Alta</h3>
+                   </CardContent>
+                </Card>
+              </div>
+
+              <Card className="border-border/50 shadow-card rounded-2xl overflow-hidden bg-card/50 backdrop-blur-sm">
+                <CardContent className="p-0">
+                  {appointments.length === 0 ? (
+                    <div className="p-16 text-center text-muted-foreground flex flex-col items-center">
+                      <Calendar size={48} className="opacity-20 mb-4" />
+                      <p className="text-lg">Sua agenda está livre.</p>
+                      <p className="text-sm mt-1">Agendamentos realizados pela IA aparecerão aqui.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-muted/30 text-muted-foreground text-xs uppercase tracking-widest font-bold border-b border-border/50">
+                            <th className="px-6 py-4">Data/Hora</th>
+                            <th className="px-6 py-4">Cliente</th>
+                            <th className="px-6 py-4">Área / Assunto</th>
+                            <th className="px-6 py-4">Status</th>
+                            <th className="px-6 py-4">Ações</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/50">
+                          {appointments.map((app) => (
+                            <tr key={app.id} className="hover:bg-muted/30 transition-colors group">
+                              <td className="px-6 py-4">
+                                <div className="flex items-center gap-2 text-navy font-medium">
+                                  <Clock size={14} className="text-bronze" />
+                                  {new Date(app.appointment_time).toLocaleString("pt-BR", {
+                                    day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"
+                                  })}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="font-semibold text-foreground">{app.contact_name}</div>
+                                <div className="text-xs text-muted-foreground">{app.contact_phone}</div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="text-sm font-medium text-navy bg-bronze/10 px-2 py-0.5 rounded w-fit mb-1">
+                                  {app.legal_area}
+                                </div>
+                                <div className="text-xs text-muted-foreground line-clamp-1">{app.subject}</div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className="text-[10px] font-bold uppercase tracking-widest bg-green-100 text-green-700 px-2 py-1 rounded">
+                                  {app.status}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4">
+                                <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                  Ver Notas
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* SECTION: HORARIOS */}
+          {activeSection === "hours" && isAdmin && (
+            <div className="animate-fade-in max-w-4xl">
+              <Card className="border-border/50 shadow-card rounded-2xl bg-card/50 backdrop-blur-sm">
+                <CardContent className="p-8 space-y-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-xl font-serif text-navy">Horários de Atendimento</h3>
+                      <p className="text-sm text-muted-foreground">Defina as faixas de horário que a IA pode oferecer aos clientes.</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {businessHours.map((bh, idx) => (
+                      <div key={bh.id} className="flex items-center gap-6 p-4 bg-muted/20 rounded-xl border border-border/30">
+                        <div className="w-32 font-semibold text-navy">{dayNames[bh.day_of_week]}</div>
+                        
+                        <div className="flex-1 flex items-center gap-4">
+                          <Input
+                            type="time"
+                            disabled={bh.is_closed}
+                            value={bh.start_time.substring(0, 5)}
+                            onChange={(e) => {
+                              const newHours = [...businessHours];
+                              newHours[idx].start_time = e.target.value;
+                              setBusinessHours(newHours);
+                            }}
+                            className="bg-white border-border w-32"
+                          />
+                          <span className="text-muted-foreground">até</span>
+                          <Input
+                            type="time"
+                            disabled={bh.is_closed}
+                            value={bh.end_time.substring(0, 5)}
+                            onChange={(e) => {
+                              const newHours = [...businessHours];
+                              newHours[idx].end_time = e.target.value;
+                              setBusinessHours(newHours);
+                            }}
+                            className="bg-white border-border w-32"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs uppercase tracking-widest text-muted-foreground">Fechado</Label>
+                          <Switch
+                            checked={bh.is_closed}
+                            onCheckedChange={(v) => {
+                              const newHours = [...businessHours];
+                              newHours[idx].is_closed = v;
+                              setBusinessHours(newHours);
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="pt-6">
+                    <Button onClick={saveBusinessHours} disabled={saving} className="bg-charcoal hover:bg-navy text-white px-8 h-12 rounded-xl shadow-md w-full sm:w-auto">
+                      {saving ? <Loader2 className="animate-spin mr-2" /> : <Clock size={18} className="mr-2" />}
+                      Salvar Grade de Horários
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           )}
 
