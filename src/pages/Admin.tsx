@@ -64,31 +64,38 @@ const Admin = () => {
   const load = async () => {
     setLoading(true);
     
-    // Check if user is admin
+    // Check if user is admin - Improved check
     const { data: sessionRes } = await supabase.auth.getSession();
     const user = sessionRes.session?.user;
     let adminCheck = false;
+    
     if (user) {
-      const { data: roleData } = await supabase
+      console.log("Logged in user ID:", user.id);
+      const { data: roles } = await supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", user.id)
-        .eq("role", "admin")
-        .maybeSingle();
-      adminCheck = !!roleData;
+        .eq("user_id", user.id);
+      
+      adminCheck = roles?.some(r => r.role === 'admin') || false;
+      console.log("User roles found:", roles, "Is Admin:", adminCheck);
       setIsAdmin(adminCheck);
       
       if (adminCheck) {
-        const { data: usersData } = await supabase.rpc('get_all_users');
+        const { data: usersData, error: usersErr } = await supabase.rpc('get_all_users');
+        if (usersErr) console.error("Error fetching users:", usersErr);
         if (usersData) setUsers(usersData);
       }
     }
 
     const [a, w, c] = await Promise.all([
-      adminCheck ? supabase.from("ai_agent_config").select("*").order("created_at", { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null }),
-      adminCheck ? supabase.from("whatsapp_settings").select("*").order("created_at", { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null }),
-      supabase.from("chat_conversations").select("*").order("created_at", { ascending: false }).limit(20),
+      adminCheck ? supabase.from("ai_agent_config").select("*").order("created_at", { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null, error: null }),
+      adminCheck ? supabase.from("whatsapp_settings").select("*").order("created_at", { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null, error: null }),
+      supabase.from("chat_conversations").select("*", { count: 'exact' }).order("created_at", { ascending: false }).limit(20),
     ]);
+
+    if (c.error) console.error("Error fetching conversations:", c.error);
+    console.log("Conversations fetched:", c.data?.length, "Total count:", c.count);
+
     setAgent(a.data as any);
     setWa(w.data as any);
     setConversations((c.data as any) ?? []);
