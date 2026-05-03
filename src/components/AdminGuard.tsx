@@ -9,24 +9,33 @@ const AdminGuard = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     let active = true;
-    const check = async () => {
-      const { data: sessionRes } = await supabase.auth.getSession();
-      const user = sessionRes.session?.user;
-      if (!user) {
+
+    const verify = async (userId: string | undefined) => {
+      if (!userId) {
         if (active) setState("deny");
         return;
       }
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("user_roles")
         .select("id")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .eq("role", "admin")
         .maybeSingle();
       if (!active) return;
+      if (error) console.error("AdminGuard role check failed:", error);
       setState(data ? "ok" : "deny");
     };
-    check();
-    const { data: sub } = supabase.auth.onAuthStateChange(() => check());
+
+    // Set up listener FIRST. Defer supabase calls with setTimeout to avoid deadlock.
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setTimeout(() => verify(session?.user?.id), 0);
+    });
+
+    // THEN check existing session
+    supabase.auth.getSession().then(({ data }) => {
+      verify(data.session?.user?.id);
+    });
+
     return () => {
       active = false;
       sub.subscription.unsubscribe();
