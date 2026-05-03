@@ -44,11 +44,29 @@ const Admin = () => {
   const [wa, setWa] = useState<WaCfg | null>(null);
   const [conversations, setConversations] = useState<Conv[]>([]);
 
+  const [isAdmin, setIsAdmin] = useState(false);
+
   const load = async () => {
     setLoading(true);
+    
+    // Check if user is admin
+    const { data: sessionRes } = await supabase.auth.getSession();
+    const user = sessionRes.session?.user;
+    let adminCheck = false;
+    if (user) {
+      const { data: roleData } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", "admin")
+        .maybeSingle();
+      adminCheck = !!roleData;
+      setIsAdmin(adminCheck);
+    }
+
     const [a, w, c] = await Promise.all([
-      supabase.from("ai_agent_config").select("*").order("created_at", { ascending: false }).limit(1).maybeSingle(),
-      supabase.from("whatsapp_settings").select("*").order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      adminCheck ? supabase.from("ai_agent_config").select("*").order("created_at", { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null }),
+      adminCheck ? supabase.from("whatsapp_settings").select("*").order("created_at", { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null }),
       supabase.from("chat_conversations").select("*").order("created_at", { ascending: false }).limit(20),
     ]);
     setAgent(a.data as any);
