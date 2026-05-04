@@ -55,12 +55,8 @@ Deno.serve(async (req) => {
 
     if (!cfg) return new Response(JSON.stringify({ reply: "Agente desativado." }), { status: 200 });
 
-    const [bhRes, appRes, knowledgeRes, historyRes] = await Promise.all([
+    const [bhRes, knowledgeRes, historyRes] = await Promise.all([
       supabase.from("business_hours").select("*"),
-      supabase
-        .from("appointments")
-        .select("appointment_time")
-        .gte("appointment_time", new Date().toISOString()),
       supabase.from("agent_knowledge").select("title, content").eq("is_active", true),
       supabase
         .from("chat_messages")
@@ -71,34 +67,25 @@ Deno.serve(async (req) => {
     ]);
 
     const bh = bhRes.data || [];
-    const apps = appRes.data || [];
     const knowledge = knowledgeRes.data || [];
     const history = (historyRes.data || []).reverse();
 
-    // 4. Construct System Prompt - Balanced Architecture
+    // 4. Construct System Prompt - PURE FROM ADMIN
+    // Aqui não injetamos nenhuma regra extra, apenas o que vem do seu painel.
     const systemPrompt = `
-# REGRAS SOBERANAS (EXTREMA PRIORIDADE)
-1. É PROIBIDO pedir mais de um dado por vez (Nome, Telefone, Email, etc). Peça um, espere a resposta, peça o próximo.
-2. NUNCA faça cálculos de fuso horário. Use o horário exatamente como o usuário fornecer.
-3. NUNCA confirme um agendamento apenas com texto. Você DEVE usar a ferramenta 'create_appointment'.
-4. Se usar a ferramenta 'suggest_quick_replies', NÃO liste as opções no seu texto.
+${cfg.system_prompt || "Você é o assistente da Axis Legis."}
 
-# PERSONALIDADE E ORIENTAÇÕES
-${cfg.system_prompt || "Você é o assistente sofisticado da Axis Legis."}
-
-# REGRAS ADICIONAIS
 ${cfg.rules_prompt || ""}
 
-# CONTEXTO ATUAL
-- Data/Hora: ${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}
-- Horários de atendimento: ${JSON.stringify(bh)}
-- Conhecimento: ${knowledge.map((k) => k.content).join(" ")}
+# CONTEXTO TÉCNICO
+- Horário Atual: ${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}
+- Horários da Empresa: ${JSON.stringify(bh)}
+- Base de Conhecimento: ${knowledge.map((k) => k.content).join(" ")}
 `;
 
     const messages = [
       { role: "system", content: systemPrompt },
-      ...history.map((m) => ({ role: m.role, content: m.content })),
-      { role: "system", content: "Lembre-se: UM dado por vez. Sem listas. Sem conversão de fuso." }
+      ...history.map((m) => ({ role: m.role, content: m.content }))
     ];
 
     // 5. Tools Schema
@@ -107,26 +94,18 @@ ${cfg.rules_prompt || ""}
         type: "function",
         function: {
           name: "create_appointment",
-          description:
-            "Executa o agendamento real. Chame APENAS após coletar Nome, Telefone, Email, Data e Assunto individualmente.",
+          description: "Registra um agendamento no sistema.",
           parameters: {
             type: "object",
             properties: {
               contact_name: { type: "string" },
               contact_phone: { type: "string" },
               contact_email: { type: "string" },
-              appointment_time: { type: "string", description: "ISO 8601 (Local Time)" },
+              appointment_time: { type: "string", description: "ISO 8601" },
               legal_area: { type: "string" },
               subject: { type: "string" },
             },
-            required: [
-              "contact_name",
-              "contact_phone",
-              "contact_email",
-              "appointment_time",
-              "legal_area",
-              "subject",
-            ],
+            required: ["contact_name", "contact_phone", "contact_email", "appointment_time", "legal_area", "subject"],
           },
         },
       },
@@ -134,17 +113,11 @@ ${cfg.rules_prompt || ""}
         type: "function",
         function: {
           name: "suggest_quick_replies",
-          description:
-            "Exibe botões de resposta. Use para categorias de serviço ou opções de 'Sim/Não'.",
+          description: "Exibe botões de resposta rápida.",
           parameters: {
             type: "object",
             properties: {
-              replies: {
-                type: "array",
-                items: { type: "string" },
-                minItems: 2,
-                maxItems: 4,
-              },
+              replies: { type: "array", items: { type: "string" } },
             },
             required: ["replies"],
           },
@@ -152,17 +125,7 @@ ${cfg.rules_prompt || ""}
       },
     ];
 
-    // 6. Map Model Name for Gateway Compatibility
-    let modelName = cfg?.model || "google/gemini-2.5-flash";
-    if (!modelName.includes("/")) {
-      if (modelName.includes("gemini")) modelName = `google/${modelName}`;
-      else if (modelName.includes("gpt")) modelName = `openai/${modelName}`;
-    }
-    if (modelName.includes("gpt-4")) modelName = "openai/gpt-4o";
-
-    console.log("Calling AI Gateway with model:", modelName);
-
-    // 7. Request to AI Gateway
+    // 6. Request to AI Gateway
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -170,7 +133,7 @@ ${cfg.rules_prompt || ""}
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: modelName,
+        model: cfg?.model || "google/gemini-2.0-flash",
         messages,
         tools,
         tool_choice: "auto",
@@ -178,79 +141,23 @@ ${cfg.rules_prompt || ""}
       }),
     });
 
-    if (!aiRes.ok) {
-      const errText = await aiRes.text();
-      console.error("Gateway Error Detail:", errText);
-      if (aiRes.status === 429) {
-        return new Response(
-          JSON.stringify({
-            reply: "Muitas solicitações no momento. Tente novamente em instantes.",
-            conversationId: conv.id,
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-      if (aiRes.status === 402) {
-        return new Response(
-          JSON.stringify({
-            reply: "O serviço de IA está temporariamente indisponível. Por favor, contate o administrador.",
-            conversationId: conv.id,
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-      return new Response(
-        JSON.stringify({
-          reply: "Estou ajustando minha sintonia com o servidor. Tente novamente em instantes.",
-          conversationId: conv.id,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
+    if (!aiRes.ok) throw new Error("AI Gateway failure");
 
     const aiJson = await aiRes.json();
     const aiMsg = aiJson.choices?.[0]?.message;
     let reply = aiMsg?.content || "";
     let quickReplies: string[] = [];
 
-    // 8. Handle Tool Execution
+    // 7. Handle Tool Execution
     if (aiMsg?.tool_calls) {
       for (const call of aiMsg.tool_calls) {
         const fnName = call.function?.name;
-        let args: any = {};
-        try {
-          args = JSON.parse(call.function?.arguments || "{}");
-        } catch (_) {
-          args = {};
-        }
+        const args = JSON.parse(call.function?.arguments || "{}");
 
         if (fnName === "create_appointment") {
-          // Forçamos o fuso horário de Brasília (UTC-3) se nenhum fuso for fornecido,
-          // ou substituímos 'Z' por '-03:00' para garantir que o horário local seja mantido no banco.
-          if (args.appointment_time) {
-            args.appointment_time = args.appointment_time.replace(/Z$/, "-03:00");
-            if (!args.appointment_time.includes("-0") && !args.appointment_time.includes("+")) {
-              args.appointment_time += "-03:00";
-            }
-          }
-
-          const missing: string[] = [];
-          for (const k of [
-            "contact_name",
-            "contact_phone",
-            "contact_email",
-            "appointment_time",
-            "legal_area",
-            "subject",
-          ]) {
-            if (!args[k]) missing.push(k);
-          }
-
-          if (missing.length > 0) {
-            reply =
-              reply ||
-              `Para concluir o agendamento, preciso ainda de: ${missing.join(", ")}. Pode me informar?`;
-            continue;
+          // Ajuste técnico de fuso para garantir Brasília no banco
+          if (args.appointment_time && !args.appointment_time.includes("-")) {
+             args.appointment_time = args.appointment_time.replace("Z", "") + "-03:00";
           }
 
           const { error: insErr } = await supabase.from("appointments").insert({
@@ -264,28 +171,21 @@ ${cfg.rules_prompt || ""}
           });
 
           if (!insErr) {
-            const displayTime = args.appointment_time.split('T')[1]?.substring(0, 5) || args.appointment_time;
-            const displayDate = new Date(args.appointment_time).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-
-            // SOBRESCREVEMOS a resposta da IA para garantir que o horário exibido seja o real do banco
-            reply = `Perfeito, ${args.contact_name}! Seu agendamento para o dia ${displayDate} às ${displayTime} foi registrado com sucesso. Em breve nossa equipe confirmará.`;
-          } else {
-            console.error("Insert Error:", insErr);
-            reply = "Tive um problema técnico ao registrar o agendamento. Pode tentar novamente em alguns instantes?";
+            // Se o agendamento deu certo, mantemos o que a IA respondeu ou geramos confirmação simples
+            const displayTime = args.appointment_time.split('T')[1]?.substring(0, 5);
+            reply = reply || `Agendamento realizado para às ${displayTime}.`;
           }
         }
 
         if (fnName === "suggest_quick_replies" && Array.isArray(args.replies)) {
-          quickReplies = args.replies.slice(0, 4).map((r: any) => String(r));
+          quickReplies = args.replies;
         }
       }
     }
 
-    if (!reply) {
-      reply = "Como posso ajudar você hoje na Axis Legis?";
-    }
+    if (!reply) reply = "Como posso ajudar?";
 
-    // 9. Save and Return
+    // 8. Save and Return
     await supabase.from("chat_messages").insert({
       conversation_id: conv.id,
       role: "assistant",
@@ -293,21 +193,14 @@ ${cfg.rules_prompt || ""}
       metadata: quickReplies.length ? { quickReplies } : {},
     });
 
-    return new Response(
-      JSON.stringify({ reply, quickReplies, conversationId: conv.id }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ reply, quickReplies, conversationId: conv.id }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (e) {
-    console.error("Function Error:", e);
-    return new Response(
-      JSON.stringify({
-        error: String(e),
-        reply: "Desculpe, tive um problema ao processar sua solicitação. Por favor, tente novamente.",
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    );
+    console.error(e);
+    return new Response(JSON.stringify({ error: String(e), reply: "Erro técnico. Tente novamente." }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
