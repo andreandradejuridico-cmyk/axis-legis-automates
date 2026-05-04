@@ -69,28 +69,17 @@ Deno.serve(async (req) => {
     const knowledge = knowledgeRes.data || [];
     const history = (historyRes.data || []).reverse();
 
-    // 4. Construct System Prompt
+    // 4. Construct System Prompt - Strict rules for behavior
     const systemPrompt = `
 ${cfg?.system_prompt || "Você é o assistente sofisticado da Axis Legis."}
 
-# CONTEXTO
-- Data/Hora atual: ${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}
-- IMPORTANTE: Todos os agendamentos devem ser feitos no fuso horário de Brasília (UTC-3).
-- Horários de atendimento: ${JSON.stringify(bh)}
-- Horários já ocupados (não oferecer): ${JSON.stringify(apps)}
-
-# CONHECIMENTO INTERNO
-${knowledge.map((k) => `## ${k.title}\n${k.content}`).join("\n\n")}
-
-# REGRAS DE RESPOSTA
-- Seja conciso (2-4 frases por turno).
-- OBRIGATÓRIO: Você deve SEMPRE oferecer de 2 a 4 opções rápidas para o usuário chamando a função "suggest_quick_replies" em TODAS as suas respostas.
-- COLETA DE DADOS: Peça os dados UM POR UM (Nome -> WhatsApp -> E-mail). Nunca peça todos de uma vez.
-- WHATSAPP: Explique que o WhatsApp é necessário para enviarmos o lembrete e a confirmação do agendamento.
-- EXTRAÇÃO DE DORES: Durante a conversa, identifique o problema ou "dor" do cliente. Use essa informação para preencher o campo "subject" (assunto) do agendamento de forma detalhada.
-- Para agendar, colete: nome completo, WhatsApp (com DDD), e-mail, área jurídica e o horário desejado.
-- AO AGENDAR: Use o fuso horário de São Paulo (UTC-3).
-- Nunca invente dados. Se faltar algo, pergunte.
+# REGRAS CRÍTICAS (DEVE OBEDECER SEMPRE)
+- COLETA DE DADOS: Você deve pedir apenas UM dado por vez (Ex: primeiro o nome. Só peça o WhatsApp depois que ele responder o nome). JAMAIS peça tudo de uma vez.
+- WHATSAPP: Explique que o WhatsApp é para enviarmos o lembrete automático.
+- EXTRAÇÃO DE DORES: Identifique o problema do cliente na conversa e use-o no agendamento.
+- BOTÕES: Use SEMPRE "suggest_quick_replies".
+- FUSO HORÁRIO: Todo agendamento é UTC-3 (São Paulo).
+- CONTEXTO: Data atual: ${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}
 `;
 
     const messages = [
