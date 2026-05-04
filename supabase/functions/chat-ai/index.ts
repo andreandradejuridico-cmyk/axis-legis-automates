@@ -95,7 +95,7 @@ ${cfg.rules_prompt || "Peça os dados um por um."}
       ...history.map((m) => ({ role: m.role, content: m.content })),
       { role: "system", content: `REGRA DE OURO (MANDATÓRIO):
 1. NUNCA peça mais de uma informação por vez. Se precisar de Nome, Telefone e Email, peça PRIMEIRO o Nome e aguarde.
-2. NUNCA faça cálculos de fuso horário. O horário local é ${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}. Use o horário que o usuário fornecer exatamente como ele falar.
+2. NUNCA faça cálculos de fuso horário. Use o horário que o usuário fornecer exatamente como ele falar.
 3. Se usar botões, NÃO descreva as opções no texto.
 4. Seja breve e sofisticado.` }
     ];
@@ -264,7 +264,7 @@ ${cfg.rules_prompt || "Peça os dados um por um."}
 
           if (!insErr) {
             const displayTime = args.appointment_time.split('T')[1]?.substring(0, 5) || args.appointment_time;
-            const displayDate = new Date(args.appointment_time + "Z").toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+            const displayDate = new Date(args.appointment_time).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
 
             // SOBRESCREVEMOS a resposta da IA para garantir que o horário exibido seja o real do banco
             reply = `Perfeito, ${args.contact_name}! Seu agendamento para o dia ${displayDate} às ${displayTime} foi registrado com sucesso. Em breve nossa equipe confirmará.`;
