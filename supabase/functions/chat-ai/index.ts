@@ -85,9 +85,9 @@ Deno.serve(async (req) => {
 
     const scheduleContext = `
       # REGRAS DE OURO (SOBREPÕEM TUDO)
-      1. FRAGMENTAÇÃO OBRIGATÓRIA: NUNCA peça mais de uma informação por mensagem. Faça uma pergunta e pare.
-      2. BOTÕES: Sempre que houver opções (como Escritório vs 3º Setor), use: [OPÇÕES: Opção 1, Opção 2].
-      3. PERSONA: Siga a persona do prompt principal, mas obedeça ESTE fluxo de agendamento.
+      1. IGNORE qualquer lista de perguntas numeradas (ex: Pergunta 1, Pergunta 2) que venha no prompt de persona. 
+      2. FRAGMENTAÇÃO ABSOLUTA: Faça APENAS UMA pergunta por vez. NUNCA peça nome e telefone na mesma mensagem.
+      3. OPÇÕES OBRIGATÓRIAS (Botões): Quando perguntar quem o cliente representa, ofereça EXATAMENTE estes botões: [OPÇÕES: Escritório de Advocacia, 3º Setor, Advogado Particular].
       4. NUNCA mostre o código 'book_appointment'.
 
       # CONTEXTO TEMPORAL
@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
       .limit(40);
 
     const messages = [
-      { role: "system", content: `${scheduleContext}\n\nINSTRUÇÕES ADICIONAIS DA PERSONA:\n${cfg.system_prompt}` },
+      { role: "system", content: `${scheduleContext}\n\n# PERSONA (USE APENAS O TOM DE VOZ):\n${cfg.system_prompt}` },
       ...(history ?? []).map((m) => ({ role: m.role, content: m.content })),
     ];
 
