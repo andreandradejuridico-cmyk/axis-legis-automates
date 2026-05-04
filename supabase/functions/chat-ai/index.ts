@@ -92,31 +92,61 @@ Deno.serve(async (req) => {
       }
     ];
 
-    // 7. Call AI Gateway
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${Deno.env.get("LOVABLE_API_KEY")}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: (cfg?.model && !cfg.model.includes('2.5-flash')) ? cfg.model : "gpt-4o-mini",
-        messages: messages,
-        tools: tools,
-        tool_choice: "auto",
-        temperature: Number(cfg?.temperature ?? 0.7),
-      }),
-    });
+    // 7. Call AI Gateway with Robust Fallback
+    let aiMsg;
+    let reply = "";
+    
+    try {
+      const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${Deno.env.get("LOVABLE_API_KEY")}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: (cfg?.model && !cfg.model.includes('2.5-flash')) ? cfg.model : "gpt-4o-mini",
+          messages: messages,
+          tools: tools,
+          tool_choice: "auto",
+          temperature: Number(cfg?.temperature ?? 0.7),
+        }),
+      });
 
-    if (!aiRes.ok) {
-      const errText = await aiRes.text();
-      console.error("AI Gateway Error:", errText);
-      throw new Error(`AI Gateway Error (${aiRes.status}): ${errText}`);
+      if (!aiRes.ok) {
+        const errText = await aiRes.text();
+        console.error("AI Gateway Primary Error:", errText);
+        throw new Error(`Primary call failed: ${aiRes.status}`);
+      }
+
+      const aiJson = await aiRes.json();
+      aiMsg = aiJson.choices?.[0]?.message;
+      reply = aiMsg?.content || "";
+
+    } catch (primaryErr) {
+      console.warn("Primary AI call failed, retrying without tools...", primaryErr);
+      
+      // FALLBACK: Simple call without tools to ensure "perfeito funcionamento"
+      const fallbackRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${Deno.env.get("LOVABLE_API_KEY")}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: (cfg?.model && !cfg.model.includes('2.5-flash')) ? cfg.model : "gpt-4o-mini",
+          messages: messages,
+          temperature: Number(cfg?.temperature ?? 0.7),
+        }),
+      });
+
+      if (!fallbackRes.ok) {
+        throw new Error(`AI Gateway Fallback failed: ${fallbackRes.status}`);
+      }
+
+      const fallbackJson = await fallbackRes.json();
+      aiMsg = fallbackJson.choices?.[0]?.message;
+      reply = aiMsg?.content || "";
     }
-
-    const aiJson = await aiRes.json();
-    const aiMsg = aiJson.choices?.[0]?.message;
-    let reply = aiMsg?.content || "";
 
     // 8. Handle Tool Calls
     if (aiMsg?.tool_calls) {
@@ -130,7 +160,7 @@ Deno.serve(async (req) => {
             appointment_time: args.appointment_time,
             legal_area: args.legal_area,
             subject: args.subject,
-            status: "pendente"
+            status: "pending"
           });
           
           if (insErr) {
@@ -144,7 +174,7 @@ Deno.serve(async (req) => {
     }
 
     if (!reply && !aiMsg?.tool_calls) {
-      console.error("AI returned empty content:", aiJson);
+      console.error("AI returned empty content");
       throw new Error("AI returned empty response");
     }
 
