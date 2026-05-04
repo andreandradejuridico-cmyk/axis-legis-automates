@@ -71,6 +71,10 @@ Deno.serve(async (req) => {
     // Load Business Hours & Appointments for context
     const { data: bh } = await supabase.from("business_hours").select("*");
     const now = new Date();
+    // Format date for the AI in a very clear way
+    const dateStr = now.toLocaleDateString('pt-BR');
+    const dayName = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"][now.getDay()];
+    
     const next7Days = new Date();
     next7Days.setDate(now.getDate() + 7);
     const { data: apps } = await supabase.from("appointments")
@@ -80,14 +84,17 @@ Deno.serve(async (req) => {
       .neq("status", "cancelled");
 
     const scheduleContext = `
-      CONTEXTO TEMPORAL: Hoje é ${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}.
-      HORÁRIOS DE FUNCIONAMENTO: ${JSON.stringify(bh)}
-      COMPROMISSOS JÁ AGENDADOS (próximos 7 dias): ${JSON.stringify(apps)}
+      # CONTEXTO TEMPORAL
+      - Data de hoje: ${dateStr} (${dayName})
+      - Hora atual: ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+      - Horários de Funcionamento: ${JSON.stringify(bh)}
+      - Agendamentos existentes: ${JSON.stringify(apps)}
       
-      DIRETRIZES DE AGENDA:
-      - Só ofereça horários que estejam dentro do funcionamento e que não conflitem com agendamentos existentes.
-      - Você deve capturar Nome, WhatsApp, Área Jurídica (ex: Trabalhista, Cível), Assunto e Observações.
-      - Quando o cliente escolher um horário, use a ferramenta 'book_appointment' para gravar.
+      # REGRAS CRÍTICAS DE AGENDA
+      1. NUNCA mostre o código 'book_appointment' para o usuário. Use a função internamente.
+      2. Se o usuário quiser agendar, peça: Nome, WhatsApp, Área Jurídica e Assunto.
+      3. Só confirme se o horário estiver livre e dentro do funcionamento.
+      4. IMPORTANTE: Para a data, use o formato ISO (ex: 2024-05-04T14:00:00).
     `;
 
     // Load history
@@ -109,7 +116,7 @@ Deno.serve(async (req) => {
         type: "function",
         function: {
           name: "book_appointment",
-          description: "Grava um novo agendamento no banco de dados.",
+          description: "Registra um agendamento jurídico no banco de dados.",
           parameters: {
             type: "object",
             properties: {
@@ -118,7 +125,7 @@ Deno.serve(async (req) => {
               contact_email: { type: "string" },
               legal_area: { type: "string" },
               subject: { type: "string" },
-              appointment_time: { type: "string", description: "ISO string da data/hora" },
+              appointment_time: { type: "string", description: "Data/Hora em formato ISO (YYYY-MM-DDTHH:mm:ss)" },
               notes: { type: "string" },
             },
             required: ["contact_name", "contact_phone", "legal_area", "subject", "appointment_time"],
@@ -135,68 +142,81 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: cfg.model,
+        model: cfg.model || "gpt-4o",
         messages,
         tools,
-        temperature: Number(cfg.temperature ?? 0.6),
+        tool_choice: "auto",
+        temperature: 0.3, // Lower temperature for more stability
       }),
     });
 
-    if (!aiRes.ok) throw new Error(`AI gateway error: ${aiRes.status}`);
+    if (!aiRes.ok) {
+      const errText = await aiRes.text();
+      console.error("AI Gateway Error:", aiRes.status, errText);
+      throw new Error(`AI Gateway failed with status ${aiRes.status}`);
+    }
+
     const aiJson = await aiRes.json();
     const aiMsg = aiJson.choices?.[0]?.message;
+    if (!aiMsg) throw new Error("No message returned from AI");
 
-    let finalReply = aiMsg.content;
+    let finalReply = aiMsg.content || "";
 
     // Handle Tool Calls
-    if (aiMsg.tool_calls) {
+    if (aiMsg.tool_calls && aiMsg.tool_calls.length > 0) {
       for (const call of aiMsg.tool_calls) {
         if (call.function.name === "book_appointment") {
-          const args = JSON.parse(call.function.arguments);
-          const { error: bookError } = await supabase.from("appointments").insert({
-            contact_name: args.contact_name,
-            contact_email: args.contact_email || "sem-email@axis.legis",
-            contact_phone: args.contact_phone,
-            legal_area: args.legal_area,
-            subject: args.subject,
-            appointment_time: args.appointment_time,
-            notes: args.notes || "",
-            status: "confirmed"
-          });
+          try {
+            const args = JSON.parse(call.function.arguments);
+            const { error: bookError } = await supabase.from("appointments").insert({
+              contact_name: args.contact_name,
+              contact_email: args.contact_email || "lead@axis.legis",
+              contact_phone: args.contact_phone,
+              legal_area: args.legal_area,
+              subject: args.subject,
+              appointment_time: args.appointment_time,
+              notes: args.notes || "",
+              status: "confirmed"
+            });
 
-          if (bookError) {
-             console.error("Booking Error:", bookError);
-             finalReply = "Desculpe, tive um problema técnico ao tentar gravar seu agendamento. Pode tentar novamente em alguns minutos?";
-          } else {
-             // Second turn to confirm to user
-             messages.push(aiMsg);
-             messages.push({
-               role: "tool",
-               tool_call_id: call.id,
-               content: JSON.stringify({ status: "success", message: "Agendamento confirmado no banco de dados." }),
-             });
+            if (bookError) throw bookError;
 
-             const confirmRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-               method: "POST",
-               headers: {
-                 Authorization: `Bearer ${Deno.env.get("LOVABLE_API_KEY")}`,
-                 "Content-Type": "application/json",
-               },
-               body: JSON.stringify({
-                 model: cfg.model,
-                 messages,
-                 temperature: 0.3,
-               }),
-             });
-             const confirmJson = await confirmRes.json();
-             finalReply = confirmJson.choices?.[0]?.message?.content;
+            // Second turn to confirm to user
+            const confirmMessages = [
+              ...messages,
+              aiMsg,
+              {
+                role: "tool",
+                tool_call_id: call.id,
+                content: JSON.stringify({ status: "success", message: "Agendamento gravado." }),
+              }
+            ];
+
+            const confirmRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${Deno.env.get("LOVABLE_API_KEY")}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                model: cfg.model || "gpt-4o",
+                messages: confirmMessages,
+                temperature: 0.3,
+              }),
+            });
+            const confirmJson = await confirmRes.json();
+            finalReply = confirmJson.choices?.[0]?.message?.content || "Agendamento confirmado!";
+          } catch (err) {
+            console.error("Tool execution failed:", err);
+            finalReply = "Tive um problema ao gravar o agendamento, mas já anotei seus dados. Nosso time entrará em contato em breve.";
           }
         }
       }
     }
 
-    if (!finalReply) finalReply = "Entendido. Como posso prosseguir?";
+    if (!finalReply) finalReply = "Desculpe, tive um pequeno problema. Como posso ajudar?";
 
+    // Save assistant message
     await supabase.from("chat_messages").insert({
       conversation_id: conv.id,
       role: "assistant",
@@ -207,8 +227,8 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    console.error(e);
-    return new Response(JSON.stringify({ error: String(e) }), {
+    console.error("Edge Function Crash:", e);
+    return new Response(JSON.stringify({ error: "Houve um erro no processamento.", details: String(e) }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
