@@ -49,136 +49,80 @@ Deno.serve(async (req) => {
     const knowledge = knowledgeRes.data || [];
     const history = (historyRes.data || []).reverse();
 
-    // 4. Construct System Prompt
-    // We keep it clean and focused on what's in the Admin panel, adding only essential dynamic data.
+    // 4. Construct System Prompt (Simplified & Robust)
     const systemPrompt = `
       ${cfg?.system_prompt || "Você é o assistente da Axis Legis."}
       
-      # INFORMAÇÕES DO SISTEMA (Contexto em Tempo Real)
-      - Data Atual: ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')}
-      - Horários de Funcionamento: ${JSON.stringify(bh)}
-      - Agendamentos Existentes: ${JSON.stringify(apps)}
+      # INFORMAÇÕES DO SISTEMA
+      - Data/Hora Atual: ${new Date().toLocaleString('pt-BR')}
+      - Horários: ${JSON.stringify(bh)}
+      - Ocupação: ${JSON.stringify(apps)}
       
       # BASE DE CONHECIMENTO
       ${knowledge.map(k => `## ${k.title}\n${k.content}`).join('\n\n')}
+
+      # REGRA DE AGENDAMENTO (IMPORTANTE)
+      Se o cliente quiser agendar e fornecer Nome, Telefone e Horário, você deve confirmar os detalhes e incluir EXATAMENTE esta linha no final da sua resposta:
+      AGENDAR_REUNIAO[NOME: nome_cliente | TEL: telefone | DATA: ISO_DATE | AREA: area | ASSUNTO: assunto]
     `;
 
-    // 5. Prepare Messages for AI
+    // 5. Prepare Messages
     const messages = [
       { role: "system", content: systemPrompt },
       ...history.map(m => ({ role: m.role, content: m.content }))
     ];
 
-    // 6. Define Tools
-    const tools = [
-      {
-        type: "function",
-        function: {
-          name: "create_appointment",
-          description: "Cria um novo agendamento de reunião no banco de dados.",
-          parameters: {
-            type: "object",
-            properties: {
-              contact_name: { type: "string", description: "Nome completo do cliente" },
-              contact_email: { type: "string", description: "Email do cliente" },
-              contact_phone: { type: "string", description: "Telefone/WhatsApp do cliente" },
-              appointment_time: { type: "string", description: "Data e hora ISO (ex: 2024-05-10T14:00:00Z)" },
-              legal_area: { type: "string", description: "Área jurídica de interesse" },
-              subject: { type: "string", description: "Assunto breve da reunião" }
-            },
-            required: ["contact_name", "contact_phone", "appointment_time"]
-          }
-        }
-      }
-    ];
+    // 6. Call AI Gateway (Standard Mode - High Compatibility)
+    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${Deno.env.get("LOVABLE_API_KEY")}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: cfg?.model || "gpt-4o-mini",
+        messages: messages,
+        temperature: Number(cfg?.temperature ?? 0.7),
+      }),
+    });
 
-    // 7. Call AI Gateway with Robust Fallback
-    let aiMsg;
-    let reply = "";
-    
-    try {
-      const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${Deno.env.get("LOVABLE_API_KEY")}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: (cfg?.model && !cfg.model.includes('2.5-flash')) ? cfg.model : "gpt-4o-mini",
-          messages: messages,
-          tools: tools,
-          tool_choice: "auto",
-          temperature: Number(cfg?.temperature ?? 0.7),
-        }),
-      });
-
-      if (!aiRes.ok) {
-        const errText = await aiRes.text();
-        console.error("AI Gateway Primary Error:", errText);
-        throw new Error(`Primary call failed: ${aiRes.status}`);
-      }
-
-      const aiJson = await aiRes.json();
-      aiMsg = aiJson.choices?.[0]?.message;
-      reply = aiMsg?.content || "";
-
-    } catch (primaryErr) {
-      console.warn("Primary AI call failed, retrying without tools...", primaryErr);
-      
-      // FALLBACK: Simple call without tools to ensure "perfeito funcionamento"
-      const fallbackRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${Deno.env.get("LOVABLE_API_KEY")}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: (cfg?.model && !cfg.model.includes('2.5-flash')) ? cfg.model : "gpt-4o-mini",
-          messages: messages,
-          temperature: Number(cfg?.temperature ?? 0.7),
-        }),
-      });
-
-      if (!fallbackRes.ok) {
-        throw new Error(`AI Gateway Fallback failed: ${fallbackRes.status}`);
-      }
-
-      const fallbackJson = await fallbackRes.json();
-      aiMsg = fallbackJson.choices?.[0]?.message;
-      reply = aiMsg?.content || "";
+    if (!aiRes.ok) {
+      const errBody = await aiRes.text();
+      throw new Error(`Gateway Error (${aiRes.status}): ${errBody}`);
     }
 
-    // 8. Handle Tool Calls
-    if (aiMsg?.tool_calls) {
-      for (const call of aiMsg.tool_calls) {
-        if (call.function.name === "create_appointment") {
-          const args = JSON.parse(call.function.arguments);
+    const aiJson = await aiRes.json();
+    let reply = aiJson.choices?.[0]?.message?.content || "";
+
+    // 7. Parse Keyword-based Booking
+    if (reply.includes("AGENDAR_REUNIAO[")) {
+      try {
+        const match = reply.match(/AGENDAR_REUNIAO\[NOME: (.*?) \| TEL: (.*?) \| DATA: (.*?) \| AREA: (.*?) \| ASSUNTO: (.*?)\]/);
+        if (match) {
+          const [_, name, tel, date, area, subject] = match;
           const { error: insErr } = await supabase.from("appointments").insert({
-            contact_name: args.contact_name,
-            contact_email: args.contact_email,
-            contact_phone: args.contact_phone,
-            appointment_time: args.appointment_time,
-            legal_area: args.legal_area,
-            subject: args.subject,
+            contact_name: name.trim(),
+            contact_phone: tel.trim(),
+            appointment_time: date.trim(),
+            legal_area: area.trim(),
+            subject: subject.trim(),
+            contact_email: "nao_informado@axis.com",
             status: "pending"
           });
           
-          if (insErr) {
-            console.error("Error creating appointment:", insErr);
-            reply = "Desculpe, tive um problema técnico ao tentar agendar. Poderia repetir o horário?";
-          } else {
-            reply = reply || `Perfeito! Seu agendamento foi confirmado para ${new Date(args.appointment_time).toLocaleString('pt-BR')}.`;
+          if (!insErr) {
+            // Remove a tag técnica da resposta final para o usuário
+            reply = reply.replace(/AGENDAR_REUNIAO\[.*?\]/, "").trim();
           }
         }
+      } catch (e) {
+        console.error("Parse error:", e);
       }
     }
 
-    if (!reply && !aiMsg?.tool_calls) {
-      console.error("AI returned empty content");
-      throw new Error("AI returned empty response");
-    }
+    if (!reply) throw new Error("AI returned empty response");
 
-    // 9. Save assistant message
+    // 8. Save assistant message
     await supabase.from("chat_messages").insert({
       conversation_id: conv.id,
       role: "assistant",
