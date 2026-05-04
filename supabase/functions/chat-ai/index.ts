@@ -93,7 +93,11 @@ ${cfg.rules_prompt || "Peça os dados um por um."}
     const messages = [
       { role: "system", content: systemPrompt },
       ...history.map((m) => ({ role: m.role, content: m.content })),
-      { role: "system", content: `LEMBRETE DE REGRA SAGRADA: ${cfg.rules_prompt}. É TERMINANTEMENTE PROIBIDO usar listas numeradas (1., 2., 3.) ou tópicos (*) no seu texto. Se usar botões, fale apenas o essencial no texto e deixe os detalhes para os botões. Não descreva os serviços no texto se eles forem virar botões. Seja extremamente breve.` }
+      { role: "system", content: `REGRA DE OURO (MANDATÓRIO):
+1. NUNCA peça mais de uma informação por vez. Se precisar de Nome, Telefone e Email, peça PRIMEIRO o Nome e aguarde.
+2. NUNCA faça cálculos de fuso horário. O horário local é ${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}. Use o horário que o usuário fornecer exatamente como ele falar.
+3. Se usar botões, NÃO descreva as opções no texto.
+4. Seja breve e sofisticado.` }
     ];
 
     // 5. Tools Schema
@@ -259,14 +263,14 @@ ${cfg.rules_prompt || "Peça os dados um por um."}
           });
 
           if (!insErr) {
-            // Exibimos o horário exatamente como foi limpo (sem conversão para UTC)
             const displayTime = args.appointment_time.split('T')[1]?.substring(0, 5) || args.appointment_time;
-            const displayDate = new Date(args.appointment_time).toLocaleDateString('pt-BR');
+            const displayDate = new Date(args.appointment_time + "Z").toLocaleDateString('pt-BR', { timeZone: 'UTC' });
 
-            reply = reply || `Perfeito, ${args.contact_name}! Seu agendamento para o dia ${displayDate} às ${displayTime} foi registrado. Em breve nossa equipe confirmará.`;
+            // SOBRESCREVEMOS a resposta da IA para garantir que o horário exibido seja o real do banco
+            reply = `Perfeito, ${args.contact_name}! Seu agendamento para o dia ${displayDate} às ${displayTime} foi registrado com sucesso. Em breve nossa equipe confirmará.`;
           } else {
             console.error("Insert Error:", insErr);
-            reply = "Tive um problema ao registrar o agendamento no fuso correto. Pode tentar novamente informando o horário?";
+            reply = "Tive um problema técnico ao registrar o agendamento. Pode tentar novamente em alguns instantes?";
           }
         }
 
