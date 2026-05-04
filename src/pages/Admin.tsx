@@ -18,6 +18,7 @@ type AgentCfg = {
   agent_name: string;
   model: string;
   system_prompt: string;
+  rules_prompt: string;
   welcome_message: string;
   initial_options: string[];
   temperature: number;
@@ -186,6 +187,7 @@ const Admin = () => {
         agent_name: agent.agent_name,
         model: agent.model,
         system_prompt: agent.system_prompt,
+        rules_prompt: agent.rules_prompt,
         welcome_message: agent.welcome_message,
         initial_options: agent.initial_options,
         temperature: agent.temperature,
@@ -664,6 +666,19 @@ const Admin = () => {
                       onChange={(e) => setAgent({ ...agent, system_prompt: e.target.value })}
                       rows={10}
                       className="bg-background font-mono text-sm leading-relaxed rounded-xl border-border p-4 shadow-inner"
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label className="text-bronze font-bold uppercase tracking-wider text-xs flex justify-between">
+                      <span>Regras Sagradas (Manual de Operação - NÃO PODE QUEBRAR)</span>
+                    </Label>
+                    <Textarea
+                      value={agent.rules_prompt}
+                      onChange={(e) => setAgent({ ...agent, rules_prompt: e.target.value })}
+                      rows={10}
+                      className="bg-bronze/5 font-mono text-sm leading-relaxed rounded-xl border-bronze/20 p-4 shadow-inner text-navy"
+                      placeholder="Ex: Peça os dados um por um..."
                     />
                   </div>
 
