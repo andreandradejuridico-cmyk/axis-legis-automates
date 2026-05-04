@@ -11,6 +11,7 @@ import { Loader2, LogOut, MessageSquare, Bot, Smartphone, Users, LayoutDashboard
 import { useNavigate } from "react-router-dom";
 import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { CustomCalendar } from "@/components/CustomCalendar";
 
 type AgentCfg = {
   id: string;
@@ -446,65 +447,7 @@ const Admin = () => {
                 </Card>
               </div>
 
-              <Card className="border-border/50 shadow-card rounded-2xl overflow-hidden bg-card/50 backdrop-blur-sm">
-                <CardContent className="p-0">
-                  {appointments.length === 0 ? (
-                    <div className="p-16 text-center text-muted-foreground flex flex-col items-center">
-                      <Calendar size={48} className="opacity-20 mb-4" />
-                      <p className="text-lg">Sua agenda está livre.</p>
-                      <p className="text-sm mt-1">Agendamentos realizados pela IA aparecerão aqui.</p>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="bg-muted/30 text-muted-foreground text-xs uppercase tracking-widest font-bold border-b border-border/50">
-                            <th className="px-6 py-4">Data/Hora</th>
-                            <th className="px-6 py-4">Cliente</th>
-                            <th className="px-6 py-4">Área / Assunto</th>
-                            <th className="px-6 py-4">Status</th>
-                            <th className="px-6 py-4">Ações</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border/50">
-                          {appointments.map((app) => (
-                            <tr key={app.id} className="hover:bg-muted/30 transition-colors group">
-                              <td className="px-6 py-4">
-                                <div className="flex items-center gap-2 text-navy font-medium">
-                                  <Clock size={14} className="text-bronze" />
-                                  {new Date(app.appointment_time).toLocaleString("pt-BR", {
-                                    day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"
-                                  })}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="font-semibold text-foreground">{app.contact_name}</div>
-                                <div className="text-xs text-muted-foreground">{app.contact_phone}</div>
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="text-sm font-medium text-navy bg-bronze/10 px-2 py-0.5 rounded w-fit mb-1">
-                                  {app.legal_area}
-                                </div>
-                                <div className="text-xs text-muted-foreground line-clamp-1">{app.subject}</div>
-                              </td>
-                              <td className="px-6 py-4">
-                                <span className="text-[10px] font-bold uppercase tracking-widest bg-green-100 text-green-700 px-2 py-1 rounded">
-                                  {app.status}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4">
-                                <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                  Ver Notas
-                                </Button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <CustomCalendar appointments={appointments} />
             </div>
           )}
 

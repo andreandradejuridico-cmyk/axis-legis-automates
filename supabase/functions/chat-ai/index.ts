@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: cfg?.model || "gpt-4o",
+        model: (cfg?.model && !cfg.model.includes('2.5-flash')) ? cfg.model : "gpt-4o-mini",
         messages: messages,
         temperature: Number(cfg?.temperature ?? 0.7),
       }),
