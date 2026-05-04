@@ -84,16 +84,21 @@ Deno.serve(async (req) => {
       .neq("status", "cancelled");
 
     const scheduleContext = `
-      # REGRAS DE OURO (SOBREPÕEM TUDO)
-      1. IGNORE qualquer lista de perguntas numeradas (ex: Pergunta 1, Pergunta 2) que venha no prompt de persona. 
-      2. FRAGMENTAÇÃO ABSOLUTA: Faça APENAS UMA pergunta por vez. NUNCA peça nome e telefone na mesma mensagem.
-      3. OPÇÕES OBRIGATÓRIAS (Botões): Quando perguntar quem o cliente representa, ofereça EXATAMENTE estes botões: [OPÇÕES: Escritório de Advocacia, 3º Setor, Advogado Particular].
-      4. NUNCA mostre o código 'book_appointment'.
+      # REGRAS DE OURO (MANDATÓRIAS)
+      1. FRAGMENTAÇÃO: Faça APENAS UMA pergunta por vez.
+      2. BOTÕES OBRIGATÓRIOS: Sempre que houver opções, você DEVE terminar a mensagem com [OPÇÕES: Item 1, Item 2].
+      3. EXEMPLO DE RESPOSTA: "Olá! Para começarmos, você é Advogado ou do Terceiro Setor? [OPÇÕES: Escritório de Advocacia, 3º Setor, Advogado Particular]"
+      
+      # FLUXO DE COLETA
+      - Passo 1: Boas-vindas e Identificação (Escritório, 3º Setor ou Particular).
+      - Passo 2: Qual o maior desafio hoje?
+      - Passo 3: Pedir o Nome.
+      - Passo 4: Pedir o WhatsApp.
+      - Passo 5: Oferecer agendamento.
 
-      # CONTEXTO TEMPORAL
+      # CONTEXTO
       - Hoje: ${dateStr} (${dayName}) | Hora: ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-      - Horários de Funcionamento: ${JSON.stringify(bh)}
-      - Ocupado: ${JSON.stringify(apps)}
+      - Horários: ${JSON.stringify(bh)}
     `;
 
     // Load history
