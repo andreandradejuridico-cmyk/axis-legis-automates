@@ -93,7 +93,7 @@ ${cfg.rules_prompt || "Peça os dados um por um."}
     const messages = [
       { role: "system", content: systemPrompt },
       ...history.map((m) => ({ role: m.role, content: m.content })),
-      { role: "system", content: `LEMBRETE DE REGRA SAGRADA: ${cfg.rules_prompt}. É TERMINANTEMENTE PROIBIDO fazer mais de uma pergunta por vez ou pedir mais de um dado agora. Se usar botões (Quick Replies), NÃO liste as opções no texto da mensagem para evitar redundância. Seja breve.` }
+      { role: "system", content: `LEMBRETE DE REGRA SAGRADA: ${cfg.rules_prompt}. É TERMINANTEMENTE PROIBIDO usar listas numeradas (1., 2., 3.) ou tópicos (*) no seu texto. Se usar botões, fale apenas o essencial no texto e deixe os detalhes para os botões. Não descreva os serviços no texto se eles forem virar botões. Seja extremamente breve.` }
     ];
 
     // 5. Tools Schema
