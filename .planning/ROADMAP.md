@@ -7,14 +7,18 @@
 - [x] Premium Dashboard UI (Sidebar)
 - [x] Codebase Mapping & Documentation
 
-## Phase 02: AI Appointment System (ACTIVE)
-- [ ] Database Schema (Appointments & Business Hours)
-- [ ] Admin UI for Managing Schedules
-- [ ] AI Integration (Availability Check & Booking)
-- [ ] Email Integration (Resend Setup)
-- [ ] WhatsApp Integration (Evolution API)
+### ✅ Fase 2: Módulo de Agenda & IA Inteligente
+- [x] Criação das tabelas `appointments` e `business_hours`.
+- [x] UI de Gestão de Agenda no Painel Admin.
+- [x] UI de Configuração de Horários.
+- [x] Integração da IA com `tool_calling` para agendamentos.
+- [x] Implementação de **Modo JSON** na IA para suporte a Botões (Quick Replies).
+- [x] Fluxo de atendimento fragmentado (uma pergunta por vez).
 
-## Phase 03: Automation & Scaling
+### 🚀 Fase 3: Notificações & Multi-Canal
+- [ ] Integração com Evolution API (WhatsApp) para lembretes automáticos.
+- [ ] Disparo de e-mails de confirmação (Resend).
+- [ ] Dashboards de métricas de conversão de leads.
 - [ ] Automated D-1 and D-0 Reminders (Cron Jobs)
 - [ ] Lead Scoring & Dashboard Analytics
 - [ ] Multi-agent support (different legal areas)

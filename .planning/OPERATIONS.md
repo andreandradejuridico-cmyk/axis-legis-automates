@@ -13,6 +13,15 @@
 - Only users with the `admin` role in `public.user_roles` can access configuration tabs (Agente IA, WhatsApp, Horários, Permissões).
 - If locked out, use the SQL Editor to force the `admin` role as documented in `PROJECT.md`.
 
-## 🤖 AI Agent Maintenance
-- The system prompt is stored in `ai_agent_config`.
-- Changes to the scheduling logic must be reflected in the Edge Functions (`supabase/functions/chat-ai`).
+## 🤖 Arquitetura da IA (Chat)
+
+A IA opera em **Modo JSON Estrito**. Isso é fundamental para a estabilidade dos botões (Quick Replies).
+
+- **Formato de Resposta:** Sempre um objeto `{ "reply": "...", "quickReplies": [...] }`.
+- **Hierarquia de Prompt:** O servidor injeta regras de agendamento (Regras de Ouro) que têm prioridade sobre o System Prompt do Painel Admin.
+- **Fragmentação:** A IA é instruída a nunca pedir mais de uma informação por vez.
+
+### ⚠️ Cuidados ao alterar o Prompt no Painel:
+- Não tente criar listas de perguntas (Pergunta 1, 2, 3) no prompt do painel, pois a IA as ignorará para manter o fluxo fragmentado.
+- Use o prompt apenas para definir a "personalidade" e o tom de voz.
+- Os botões de identificação (Escritório, 3º Setor, Advogado Particular) são gerados automaticamente pelo sistema no início da conversa.
