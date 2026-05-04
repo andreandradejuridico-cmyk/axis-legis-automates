@@ -40,18 +40,58 @@ export const CustomCalendar = ({ appointments = [] }: { appointments?: Appointme
   const [loadingHolidays, setLoadingHolidays] = useState(false);
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear().toString());
 
-  // New local holiday form state
-  const [newHolidayName, setNewHolidayName] = useState('');
-  const [newHolidayDate, setNewHolidayDate] = useState('');
-  const [newHolidayType, setNewHolidayType] = useState('municipal');
-  const [isAddingHoliday, setIsAddingHoliday] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [isManagingEvent, setIsManagingEvent] = useState(false);
+  const [isCreatingApp, setIsCreatingApp] = useState(false);
+
+  // Form State for Manual Appointment
+  const [formData, setFormData] = useState({
+    contact_name: '',
+    contact_phone: '',
+    contact_email: '',
+    appointment_time: '',
+    legal_area: '',
+    subject: ''
+  });
 
   const events: Event[] = appointments.map(app => ({
     id: app.id,
     title: `${app.contact_name} - ${app.legal_area}`,
     date: parseISO(app.appointment_time),
-    type: 'appointment'
+    type: 'appointment',
+    description: `Cliente: ${app.contact_name}\nAssunto: ${app.legal_area}\nTel: ${app.contact_phone || 'N/A'}`
   }));
+
+  const handleCreateApp = async () => {
+    if (!formData.contact_name || !formData.appointment_time) return toast.error("Nome e Horário são obrigatórios.");
+    
+    const { error } = await supabase.from('appointments').insert({
+      ...formData,
+      status: 'pending'
+    });
+
+    if (error) {
+      toast.error("Erro ao criar agendamento.");
+    } else {
+      toast.success("Agendamento criado com sucesso!");
+      setIsCreatingApp(false);
+      setFormData({ contact_name: '', contact_phone: '', contact_email: '', appointment_time: '', legal_area: '', subject: '' });
+      window.location.reload(); // Refresh to get new list from Admin parent
+    }
+  };
+
+  const handleDeleteApp = async (id: string) => {
+    if (!confirm("Tem certeza que deseja excluir este agendamento?")) return;
+    
+    const { error } = await supabase.from('appointments').delete().eq('id', id);
+    if (error) {
+      toast.error("Erro ao excluir.");
+    } else {
+      toast.success("Excluído com sucesso.");
+      setIsManagingEvent(false);
+      window.location.reload();
+    }
+  };
 
   const fetchHolidays = async (year: string) => {
     setLoadingHolidays(true);
@@ -159,6 +199,38 @@ export const CustomCalendar = ({ appointments = [] }: { appointments?: Appointme
           </div>
           
           <div className="flex items-center gap-4">
+            <Dialog open={isCreatingApp} onOpenChange={setIsCreatingApp}>
+              <DialogTrigger asChild>
+                <Button className="bg-bronze hover:bg-bronze-dark text-white shadow-md">
+                  + Novo Agendamento
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-card text-foreground">
+                <DialogHeader><DialogTitle>Agendamento Manual</DialogTitle></DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label>Nome do Cliente</Label>
+                    <Input value={formData.contact_name} onChange={e => setFormData({...formData, contact_name: e.target.value})} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label>Telefone</Label>
+                      <Input value={formData.contact_phone} onChange={e => setFormData({...formData, contact_phone: e.target.value})} />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Horário</Label>
+                      <Input type="datetime-local" value={formData.appointment_time} onChange={e => setFormData({...formData, appointment_time: e.target.value})} />
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Área Jurídica</Label>
+                    <Input value={formData.legal_area} onChange={e => setFormData({...formData, legal_area: e.target.value})} />
+                  </div>
+                  <Button onClick={handleCreateApp} className="bg-navy text-white">Salvar Agendamento</Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
             <Select value={selectedYear} onValueChange={(y) => { setSelectedYear(y); setCurrentDate(new Date(parseInt(y), currentDate.getMonth(), 1)); }}>
               <SelectTrigger className="w-[100px] bg-white/5 border-white/10 text-white focus:ring-bronze">
                 <SelectValue placeholder="Ano" />
@@ -258,15 +330,20 @@ export const CustomCalendar = ({ appointments = [] }: { appointments?: Appointme
                   {dayEvents.map(event => (
                     <div 
                       key={event.id}
-                      title={event.title}
-                      className={`text-[10px] px-2 py-1 rounded truncate border font-medium flex items-center gap-1.5
+                      onClick={() => {
+                        if (event.type === 'appointment') {
+                          setSelectedEvent(event);
+                          setIsManagingEvent(true);
+                        }
+                      }}
+                      className={`text-[10px] px-2 py-1 rounded truncate border font-medium flex items-center gap-1.5 cursor-pointer
                         ${event.type === 'holiday' ? 'bg-red-50 text-red-700 border-red-100' : ''}
                         ${event.type === 'appointment' ? 'bg-blue-50 text-blue-700 border-blue-100' : ''}
                         ${event.type === 'custom' ? 'bg-charcoal/5 text-charcoal border-border' : ''}
                       `}
                     >
                       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${event.type === 'holiday' ? 'bg-red-500' : 'bg-blue-500'}`} />
-                      <span className="truncate">{event.title}</span>
+                      <span className="truncate">{event.type === 'appointment' ? format(event.date, 'HH:mm') : ''} {event.title}</span>
                     </div>
                   ))}
                 </div>
@@ -274,6 +351,29 @@ export const CustomCalendar = ({ appointments = [] }: { appointments?: Appointme
             );
           })}
         </div>
+
+        {/* Manage Appointment Modal */}
+        <Dialog open={isManagingEvent} onOpenChange={setIsManagingEvent}>
+          <DialogContent className="bg-card text-foreground">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CalendarIcon className="text-bronze" /> Detalhes do Agendamento
+              </DialogTitle>
+            </DialogHeader>
+            {selectedEvent && (
+              <div className="space-y-4 py-4">
+                <div className="bg-muted/20 p-4 rounded-xl border border-border">
+                  <p className="text-sm font-bold text-navy">{selectedEvent.title}</p>
+                  <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">{selectedEvent.description}</p>
+                  <div className="mt-4 pt-4 border-t border-border flex justify-between items-center">
+                    <p className="text-sm font-mono text-bronze">{format(selectedEvent.date, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
+                    <Button variant="destructive" size="sm" onClick={() => handleDeleteApp(selectedEvent.id)}>Excluir</Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
         
         <div className="mt-6 flex items-center gap-6 text-xs text-muted-foreground bg-muted/20 p-4 rounded-xl border border-border/50">
           <div className="flex items-center gap-2 font-medium">

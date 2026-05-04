@@ -249,15 +249,15 @@ ${knowledge.map((k) => `## ${k.title}\n${k.content}`).join("\n\n")}
           });
 
           if (!insErr) {
-            reply =
-              reply ||
-              `Perfeito, ${args.contact_name}! Seu agendamento para ${new Date(
-                args.appointment_time,
-              ).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })} foi registrado. Em breve nossa equipe confirmará.`;
+            // Se o horário vier sem offset, assumimos -03:00 para exibição correta
+            const displayTime = args.appointment_time.includes('Z') || args.appointment_time.includes('-') || args.appointment_time.includes('+') 
+              ? new Date(args.appointment_time).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })
+              : args.appointment_time.split('T')[1].substring(0, 5); // Fallback simples para o horário local
+
+            reply = reply || `Perfeito, ${args.contact_name}! Seu agendamento para o dia ${new Date(args.appointment_time).toLocaleDateString('pt-BR')} às ${displayTime} foi registrado. Em breve nossa equipe confirmará.`;
           } else {
             console.error("Insert Error:", insErr);
-            reply =
-              "Tive um problema ao registrar o agendamento. Pode tentar novamente em instantes?";
+            reply = "Tive um problema ao registrar o agendamento no fuso correto. Pode tentar novamente informando o horário?";
           }
         }
 
