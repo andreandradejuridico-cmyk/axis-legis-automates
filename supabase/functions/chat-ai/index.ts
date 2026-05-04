@@ -93,7 +93,7 @@ ${cfg.rules_prompt || "Peça os dados um por um."}
     const messages = [
       { role: "system", content: systemPrompt },
       ...history.map((m) => ({ role: m.role, content: m.content })),
-      { role: "system", content: `LEMBRETE DE REGRA SAGRADA: ${cfg.rules_prompt}. É TERMINANTEMENTE PROIBIDO fazer mais de uma pergunta por vez ou pedir mais de um dado agora. Seja breve.` }
+      { role: "system", content: `LEMBRETE DE REGRA SAGRADA: ${cfg.rules_prompt}. É TERMINANTEMENTE PROIBIDO fazer mais de uma pergunta por vez ou pedir mais de um dado agora. Se usar botões (Quick Replies), NÃO liste as opções no texto da mensagem para evitar redundância. Seja breve.` }
     ];
 
     // 5. Tools Schema
