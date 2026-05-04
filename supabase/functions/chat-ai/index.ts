@@ -77,27 +77,28 @@ Deno.serve(async (req) => {
 
     // 4. Construct System Prompt - Balanced Architecture
     const systemPrompt = `
+# REGRAS SOBERANAS (EXTREMA PRIORIDADE)
+1. É PROIBIDO pedir mais de um dado por vez (Nome, Telefone, Email, etc). Peça um, espere a resposta, peça o próximo.
+2. NUNCA faça cálculos de fuso horário. Use o horário exatamente como o usuário fornecer.
+3. NUNCA confirme um agendamento apenas com texto. Você DEVE usar a ferramenta 'create_appointment'.
+4. Se usar a ferramenta 'suggest_quick_replies', NÃO liste as opções no seu texto.
+
 # PERSONALIDADE E ORIENTAÇÕES
 ${cfg.system_prompt || "Você é o assistente sofisticado da Axis Legis."}
 
-# REGRAS SAGRADAS (MANUAL TÉCNICO)
-${cfg.rules_prompt || "Peça os dados um por um."}
+# REGRAS ADICIONAIS
+${cfg.rules_prompt || ""}
 
-# CONTEXTO ATUAL (SISTEMA)
+# CONTEXTO ATUAL
 - Data/Hora: ${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}
 - Horários de atendimento: ${JSON.stringify(bh)}
-- Horários ocupados: ${JSON.stringify(apps)}
-- Conhecimento Adicional: ${knowledge.map((k) => `## ${k.title}\n${k.content}`).join("\n\n")}
+- Conhecimento: ${knowledge.map((k) => k.content).join(" ")}
 `;
 
     const messages = [
       { role: "system", content: systemPrompt },
       ...history.map((m) => ({ role: m.role, content: m.content })),
-      { role: "system", content: `REGRA DE OURO (MANDATÓRIO):
-1. NUNCA peça mais de uma informação por vez. Se precisar de Nome, Telefone e Email, peça PRIMEIRO o Nome e aguarde.
-2. NUNCA faça cálculos de fuso horário. Use o horário que o usuário fornecer exatamente como ele falar.
-3. Se usar botões, NÃO descreva as opções no texto.
-4. Seja breve e sofisticado.` }
+      { role: "system", content: "Lembre-se: UM dado por vez. Sem listas. Sem conversão de fuso." }
     ];
 
     // 5. Tools Schema
@@ -107,14 +108,14 @@ ${cfg.rules_prompt || "Peça os dados um por um."}
         function: {
           name: "create_appointment",
           description:
-            "Reserva um horário na agenda. Exige todos os dados confirmados pelo usuário.",
+            "Executa o agendamento real. Chame APENAS após coletar Nome, Telefone, Email, Data e Assunto individualmente.",
           parameters: {
             type: "object",
             properties: {
               contact_name: { type: "string" },
               contact_phone: { type: "string" },
-              contact_email: { type: "string", description: "E-mail do contato" },
-              appointment_time: { type: "string", description: "ISO 8601" },
+              contact_email: { type: "string" },
+              appointment_time: { type: "string", description: "ISO 8601 (Local Time)" },
               legal_area: { type: "string" },
               subject: { type: "string" },
             },
@@ -134,7 +135,7 @@ ${cfg.rules_prompt || "Peça os dados um por um."}
         function: {
           name: "suggest_quick_replies",
           description:
-            "Sugere de 2 a 4 opções de resposta rápida para o usuário escolher. Use quando ajudar a guiar a conversa.",
+            "Exibe botões de resposta. Use para categorias de serviço ou opções de 'Sim/Não'.",
           parameters: {
             type: "object",
             properties: {
