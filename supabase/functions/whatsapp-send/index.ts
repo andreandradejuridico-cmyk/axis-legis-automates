@@ -56,9 +56,20 @@ Deno.serve(async (req) => {
       });
     }
 
-    const baseUrl = Deno.env.get("EVOLUTION_API_URL")!.replace(/\/$/, "");
-    const apiKey = Deno.env.get("EVOLUTION_API_KEY")!;
-    const instance = Deno.env.get("EVOLUTION_INSTANCE_NAME")!;
+    // Fetch WhatsApp Settings from DB instead of Env Vars
+    const { data: wa } = await admin
+      .from("whatsapp_settings")
+      .select("api_url, api_key, instance_name")
+      .limit(1)
+      .maybeSingle();
+
+    if (!wa || !wa.api_url || !wa.api_key || !wa.instance_name) {
+      throw new Error("Configurações do WhatsApp não encontradas ou incompletas no banco de dados.");
+    }
+
+    const baseUrl = wa.api_url.replace(/\/$/, "");
+    const apiKey = wa.api_key;
+    const instance = wa.instance_name;
 
     const res = await fetch(`${baseUrl}/message/sendText/${instance}`, {
       method: "POST",

@@ -815,10 +815,22 @@ const Admin = () => {
                     </div>
                   </div>
 
-                  <div className="pt-6">
-                    <Button onClick={saveWa} disabled={saving} className="bg-charcoal hover:bg-navy text-white px-8 h-12 rounded-xl shadow-md w-full sm:w-auto transition-all">
+                  <div className="pt-6 flex flex-wrap gap-4">
+                    <Button onClick={saveWa} disabled={saving} className="bg-charcoal hover:bg-navy text-white px-8 h-12 rounded-xl shadow-md transition-all">
                       {saving ? <Loader2 className="animate-spin mr-2" /> : <Smartphone size={18} className="mr-2" />}
-                      Atualizar Parâmetros do WhatsApp
+                      Salvar Configurações
+                    </Button>
+                    
+                    <Button 
+                      variant="outline"
+                      onClick={async () => {
+                        const { data, error } = await supabase.functions.invoke('scheduled-reminders');
+                        if (error) toast.error("Erro ao processar lembretes: " + error.message);
+                        else toast.success(`Processado: ${data.processed} lembretes enviados.`);
+                      }} 
+                      className="border-bronze text-bronze hover:bg-bronze/10 h-12 rounded-xl"
+                    >
+                      Disparar Lembretes (Manual)
                     </Button>
                   </div>
                 </CardContent>
