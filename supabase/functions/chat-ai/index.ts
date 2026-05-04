@@ -84,17 +84,16 @@ Deno.serve(async (req) => {
       .neq("status", "cancelled");
 
     const scheduleContext = `
+      # REGRAS DE OURO (SOBREPÕEM TUDO)
+      1. FRAGMENTAÇÃO OBRIGATÓRIA: NUNCA peça mais de uma informação por mensagem. Faça uma pergunta e pare.
+      2. BOTÕES: Sempre que houver opções (como Escritório vs 3º Setor), use: [OPÇÕES: Opção 1, Opção 2].
+      3. PERSONA: Siga a persona do prompt principal, mas obedeça ESTE fluxo de agendamento.
+      4. NUNCA mostre o código 'book_appointment'.
+
       # CONTEXTO TEMPORAL
-      - Data de hoje: ${dateStr} (${dayName})
-      - Hora atual: ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+      - Hoje: ${dateStr} (${dayName}) | Hora: ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
       - Horários de Funcionamento: ${JSON.stringify(bh)}
-      - Agendamentos existentes: ${JSON.stringify(apps)}
-      
-      # REGRAS CRÍTICAS DE CONVERSA
-      1. FRAGMENTAÇÃO: Faça APENAS UMA pergunta por vez. Não peça todos os dados de uma vez.
-      2. BOTÕES: Quando oferecer opções claras, use o formato [OPÇÕES: Opção 1, Opção 2] no FINAL da mensagem para gerar botões.
-      3. NUNCA mostre o código 'book_appointment' para o usuário.
-      4. Colete: Nome -> WhatsApp -> Área Jurídica (use botões) -> Assunto -> Horário.
+      - Ocupado: ${JSON.stringify(apps)}
     `;
 
     // Load history
@@ -106,7 +105,7 @@ Deno.serve(async (req) => {
       .limit(40);
 
     const messages = [
-      { role: "system", content: `${cfg.system_prompt}\n\n${scheduleContext}` },
+      { role: "system", content: `${scheduleContext}\n\nINSTRUÇÕES ADICIONAIS DA PERSONA:\n${cfg.system_prompt}` },
       ...(history ?? []).map((m) => ({ role: m.role, content: m.content })),
     ];
 
