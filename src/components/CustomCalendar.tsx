@@ -43,6 +43,12 @@ export const CustomCalendar = ({ appointments = [] }: { appointments?: Appointme
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [isManagingEvent, setIsManagingEvent] = useState(false);
   const [isCreatingApp, setIsCreatingApp] = useState(false);
+  const [isAddingHoliday, setIsAddingHoliday] = useState(false);
+
+  // Holiday Form State
+  const [newHolidayName, setNewHolidayName] = useState('');
+  const [newHolidayDate, setNewHolidayDate] = useState('');
+  const [newHolidayType, setNewHolidayType] = useState('municipal');
 
   // Form State for Manual Appointment
   const [formData, setFormData] = useState({
