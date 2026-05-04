@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
     if (!aiRes.ok) {
       const errText = await aiRes.text();
       console.error("AI Gateway Error:", errText);
-      throw new Error(`AI Gateway responded with status ${aiRes.status}`);
+      throw new Error(`AI Gateway Error (${aiRes.status}): ${errText}`);
     }
 
     const aiJson = await aiRes.json();
