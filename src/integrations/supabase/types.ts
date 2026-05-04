@@ -94,6 +94,8 @@ export type Database = {
           id: string
           legal_area: string
           notes: string | null
+          reminder_24h_sent: boolean | null
+          reminder_2h_sent: boolean | null
           status: string
           subject: string
         }
@@ -107,6 +109,8 @@ export type Database = {
           id?: string
           legal_area: string
           notes?: string | null
+          reminder_24h_sent?: boolean | null
+          reminder_2h_sent?: boolean | null
           status?: string
           subject: string
         }
@@ -120,6 +124,8 @@ export type Database = {
           id?: string
           legal_area?: string
           notes?: string | null
+          reminder_24h_sent?: boolean | null
+          reminder_2h_sent?: boolean | null
           status?: string
           subject?: string
         }
@@ -297,6 +303,8 @@ export type Database = {
       }
       whatsapp_settings: {
         Row: {
+          api_key: string | null
+          api_url: string | null
           connected: boolean
           created_at: string
           default_number: string | null
@@ -307,6 +315,8 @@ export type Database = {
           webhook_secret: string | null
         }
         Insert: {
+          api_key?: string | null
+          api_url?: string | null
           connected?: boolean
           created_at?: string
           default_number?: string | null
@@ -317,6 +327,8 @@ export type Database = {
           webhook_secret?: string | null
         }
         Update: {
+          api_key?: string | null
+          api_url?: string | null
           connected?: boolean
           created_at?: string
           default_number?: string | null
