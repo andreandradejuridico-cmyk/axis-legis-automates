@@ -84,10 +84,13 @@ ${knowledge.map((k) => `## ${k.title}\n${k.content}`).join("\n\n")}
 
 # REGRAS DE RESPOSTA
 - Seja conciso (2-4 frases por turno).
-- OBRIGATÓRIO: Você deve SEMPRE oferecer de 2 a 4 opções rápidas para o usuário chamando a função "suggest_quick_replies" em TODAS as suas respostas. Use botões como "Agendar Reunião", "Áreas de Atuação", "Falar com Advogado", etc.
-- Para agendar, primeiro colete: nome completo, telefone (com DDD), e-mail, área jurídica, assunto e horário desejado. Só então chame "create_appointment".
-- IMPORTANTE NO AGENDAMENTO: Certifique-se de que o horário gravado seja EXATAMENTE o que o usuário pediu no fuso de São Paulo (UTC-3).
-- Nunca invente e-mail, telefone ou nome do contato. Se faltar dado, pergunte.
+- OBRIGATÓRIO: Você deve SEMPRE oferecer de 2 a 4 opções rápidas para o usuário chamando a função "suggest_quick_replies" em TODAS as suas respostas.
+- COLETA DE DADOS: Peça os dados UM POR UM (Nome -> WhatsApp -> E-mail). Nunca peça todos de uma vez.
+- WHATSAPP: Explique que o WhatsApp é necessário para enviarmos o lembrete e a confirmação do agendamento.
+- EXTRAÇÃO DE DORES: Durante a conversa, identifique o problema ou "dor" do cliente. Use essa informação para preencher o campo "subject" (assunto) do agendamento de forma detalhada.
+- Para agendar, colete: nome completo, WhatsApp (com DDD), e-mail, área jurídica e o horário desejado.
+- AO AGENDAR: Use o fuso horário de São Paulo (UTC-3).
+- Nunca invente dados. Se faltar algo, pergunte.
 `;
 
     const messages = [

@@ -27,6 +27,7 @@ const ChatWidget = () => {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     supabase
@@ -47,10 +48,24 @@ const ChatWidget = () => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, loading]);
 
+  useEffect(() => {
+    if (!loading && open) {
+      inputRef.current?.focus();
+    }
+  }, [loading, open]);
+
+  const handleInputHeight = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const element = e.target;
+    element.style.height = 'auto';
+    element.style.height = `${Math.min(element.scrollHeight, 120)}px`;
+    setInput(element.value);
+  };
+
   const send = async (textOverride?: string) => {
     const text = (textOverride || input).trim();
     if (!text || loading) return;
     setInput("");
+    if (inputRef.current) inputRef.current.style.height = 'auto';
     setMessages((m) => [...m, { role: "user", content: text }]);
     setLoading(true);
     try {
@@ -198,16 +213,24 @@ const ChatWidget = () => {
                 e.preventDefault();
                 send();
               }}
-              className="flex items-center gap-2 p-3 border-t border-bronze/20 bg-primary"
+              className="flex items-end gap-2 p-3 border-t border-bronze/20 bg-primary"
             >
-              <Input
+              <textarea
+                ref={inputRef}
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={handleInputHeight}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    send();
+                  }
+                }}
                 placeholder="Escreva sua mensagem…"
-                className="bg-primary-foreground/5 border-bronze/20 text-primary-foreground placeholder:text-primary-foreground/40 focus:border-bronze/50"
+                className="flex-1 bg-primary-foreground/5 border border-bronze/20 text-primary-foreground placeholder:text-primary-foreground/40 focus:border-bronze/50 focus:outline-none rounded-lg p-2.5 text-sm resize-none min-h-[40px] max-h-[120px] transition-all"
                 disabled={loading}
+                rows={1}
               />
-              <Button type="submit" variant="hero" size="icon" disabled={loading || !input.trim()}>
+              <Button type="submit" variant="hero" size="icon" disabled={loading || !input.trim()} className="mb-0.5">
                 <Send size={16} />
               </Button>
             </form>
