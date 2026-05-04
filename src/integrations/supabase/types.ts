@@ -14,12 +14,43 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_knowledge: {
+        Row: {
+          category: string | null
+          content: string
+          created_at: string
+          id: string
+          is_active: boolean | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          content: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ai_agent_config: {
         Row: {
           agent_name: string
           created_at: string
           enabled: boolean
           id: string
+          initial_options: string[] | null
           model: string
           system_prompt: string
           temperature: number
@@ -31,6 +62,7 @@ export type Database = {
           created_at?: string
           enabled?: boolean
           id?: string
+          initial_options?: string[] | null
           model?: string
           system_prompt?: string
           temperature?: number
@@ -42,11 +74,81 @@ export type Database = {
           created_at?: string
           enabled?: boolean
           id?: string
+          initial_options?: string[] | null
           model?: string
           system_prompt?: string
           temperature?: number
           updated_at?: string
           welcome_message?: string
+        }
+        Relationships: []
+      }
+      appointments: {
+        Row: {
+          appointment_time: string
+          contact_email: string
+          contact_name: string
+          contact_phone: string
+          created_at: string
+          duration_minutes: number | null
+          id: string
+          legal_area: string
+          notes: string | null
+          status: string
+          subject: string
+        }
+        Insert: {
+          appointment_time: string
+          contact_email: string
+          contact_name: string
+          contact_phone: string
+          created_at?: string
+          duration_minutes?: number | null
+          id?: string
+          legal_area: string
+          notes?: string | null
+          status?: string
+          subject: string
+        }
+        Update: {
+          appointment_time?: string
+          contact_email?: string
+          contact_name?: string
+          contact_phone?: string
+          created_at?: string
+          duration_minutes?: number | null
+          id?: string
+          legal_area?: string
+          notes?: string | null
+          status?: string
+          subject?: string
+        }
+        Relationships: []
+      }
+      business_hours: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          end_time: string
+          id: string
+          is_closed: boolean | null
+          start_time: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          end_time: string
+          id?: string
+          is_closed?: boolean | null
+          start_time: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          is_closed?: boolean | null
+          start_time?: string
         }
         Relationships: []
       }
@@ -142,6 +244,33 @@ export type Database = {
           id?: string
           message?: string | null
           name?: string
+        }
+        Relationships: []
+      }
+      local_holidays: {
+        Row: {
+          created_at: string
+          holiday_date: string
+          id: string
+          name: string
+          type: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          holiday_date: string
+          id?: string
+          name: string
+          type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          holiday_date?: string
+          id?: string
+          name?: string
+          type?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
