@@ -153,7 +153,7 @@ ${cfg.rules_prompt || "Peça os dados um por um."}
       if (modelName.includes("gemini")) modelName = `google/${modelName}`;
       else if (modelName.includes("gpt")) modelName = `openai/${modelName}`;
     }
-    if (modelName.includes("gpt-4")) modelName = "openai/gpt-5-mini";
+    if (modelName.includes("gpt-4")) modelName = "openai/gpt-4o";
 
     console.log("Calling AI Gateway with model:", modelName);
 
@@ -220,9 +220,13 @@ ${cfg.rules_prompt || "Peça os dados um por um."}
         }
 
         if (fnName === "create_appointment") {
-          // Limpeza radical de fuso horário: removemos Z ou offsets para forçar local-time
+          // Forçamos o fuso horário de Brasília (UTC-3) se nenhum fuso for fornecido,
+          // ou substituímos 'Z' por '-03:00' para garantir que o horário local seja mantido no banco.
           if (args.appointment_time) {
-            args.appointment_time = args.appointment_time.replace(/Z|[+-]\d{2}:?\d{2}$/, "");
+            args.appointment_time = args.appointment_time.replace(/Z$/, "-03:00");
+            if (!args.appointment_time.includes("-0") && !args.appointment_time.includes("+")) {
+              args.appointment_time += "-03:00";
+            }
           }
 
           const missing: string[] = [];

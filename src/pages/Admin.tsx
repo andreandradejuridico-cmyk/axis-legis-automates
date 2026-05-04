@@ -127,7 +127,7 @@ const Admin = () => {
       adminCheck ? supabase.from("ai_agent_config").select("*").order("created_at", { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null, error: null }),
       adminCheck ? supabase.from("whatsapp_settings").select("*").order("created_at", { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null, error: null }),
       supabase.from("chat_conversations").select("*", { count: 'exact' }).order("created_at", { ascending: false }).limit(20),
-      supabase.from("appointments").select("*").order("appointment_time", { ascending: true }),
+      supabase.from("appointments").select("*").order("appointment_time", { ascending: true }).limit(100),
       supabase.from("business_hours").select("*").order("day_of_week", { ascending: true }),
       adminCheck ? supabase.from("agent_knowledge").select("*").order("created_at", { ascending: false }) : Promise.resolve({ data: null, error: null }),
     ]);

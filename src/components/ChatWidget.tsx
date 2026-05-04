@@ -69,9 +69,18 @@ const ChatWidget = () => {
     setMessages((m) => [...m, { role: "user", content: text }]);
     setLoading(true);
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
+
       const { data, error } = await supabase.functions.invoke("chat-ai", {
         body: { sessionId: getSessionId(), message: text },
+        headers: {
+          "x-client-info": "axis-chat-widget",
+        },
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
       
       if (error) throw error;
       
