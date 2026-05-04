@@ -84,17 +84,20 @@ Deno.serve(async (req) => {
       .neq("status", "cancelled");
 
     const scheduleContext = `
-      # REGRAS DE OURO (MANDATÓRIAS)
-      1. FRAGMENTAÇÃO: Faça APENAS UMA pergunta por vez.
-      2. BOTÕES OBRIGATÓRIOS: Sempre que houver opções, você DEVE terminar a mensagem com [OPÇÕES: Item 1, Item 2].
-      3. EXEMPLO DE RESPOSTA: "Olá! Para começarmos, você é Advogado ou do Terceiro Setor? [OPÇÕES: Escritório de Advocacia, 3º Setor, Advogado Particular]"
-      
-      # FLUXO DE COLETA
-      - Passo 1: Boas-vindas e Identificação (Escritório, 3º Setor ou Particular).
-      - Passo 2: Qual o maior desafio hoje?
-      - Passo 3: Pedir o Nome.
-      - Passo 4: Pedir o WhatsApp.
-      - Passo 5: Oferecer agendamento.
+      # REGRAS TÉCNICAS OBRIGATÓRIAS
+      Você deve responder EXCLUSIVAMENTE em formato JSON.
+      Estrutura esperada:
+      {
+        "reply": "Sua resposta textual para o cliente aqui",
+        "quickReplies": ["Opção 1", "Opção 2"] (opcional, use apenas quando houver escolhas claras)
+      }
+
+      # FLUXO DE ATENDIMENTO (FRAGMENTADO)
+      1. Pergunte quem o cliente representa. OPÇÕES OBRIGATÓRIAS: ["Escritório de Advocacia", "3º Setor", "Advogado Particular"].
+      2. Pergunte o maior desafio de automação.
+      3. Peça o Nome.
+      4. Peça o WhatsApp.
+      5. Ofereça agendamento baseado na grade.
 
       # CONTEXTO
       - Hoje: ${dateStr} (${dayName}) | Hora: ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
@@ -110,7 +113,7 @@ Deno.serve(async (req) => {
       .limit(40);
 
     const messages = [
-      { role: "system", content: `${scheduleContext}\n\n# PERSONA (USE APENAS O TOM DE VOZ):\n${cfg.system_prompt}` },
+      { role: "system", content: `${scheduleContext}\n\nPERSONA E TOM DE VOZ:\n${cfg.system_prompt}` },
       ...(history ?? []).map((m) => ({ role: m.role, content: m.content })),
     ];
 
@@ -129,7 +132,7 @@ Deno.serve(async (req) => {
               contact_email: { type: "string" },
               legal_area: { type: "string" },
               subject: { type: "string" },
-              appointment_time: { type: "string", description: "Data/Hora em formato ISO (YYYY-MM-DDTHH:mm:ss)" },
+              appointment_time: { type: "string", description: "ISO YYYY-MM-DDTHH:mm:ss" },
               notes: { type: "string" },
             },
             required: ["contact_name", "contact_phone", "legal_area", "subject", "appointment_time"],
@@ -150,22 +153,31 @@ Deno.serve(async (req) => {
         messages,
         tools,
         tool_choice: "auto",
-        temperature: 0.3, // Lower temperature for more stability
+        response_format: { type: "json_object" },
+        temperature: 0.2,
       }),
     });
 
-    if (!aiRes.ok) {
-      const errText = await aiRes.text();
-      console.error("AI Gateway Error:", aiRes.status, errText);
-      throw new Error(`AI Gateway failed with status ${aiRes.status}`);
-    }
+    if (!aiRes.ok) throw new Error(`AI Gateway failed: ${aiRes.status}`);
 
     const aiJson = await aiRes.json();
     const aiMsg = aiJson.choices?.[0]?.message;
     if (!aiMsg) throw new Error("No message returned from AI");
 
-    let finalReply = aiMsg.content || "";
+    let finalReply = "";
     let quickReplies: string[] = [];
+
+    // Parse Initial JSON Response
+    if (aiMsg.content) {
+      try {
+        const parsed = JSON.parse(aiMsg.content);
+        finalReply = parsed.reply;
+        quickReplies = parsed.quickReplies || [];
+      } catch (e) {
+        console.error("JSON Parse Error", e);
+        finalReply = aiMsg.content; // fallback
+      }
+    }
 
     // Handle Tool Calls
     if (aiMsg.tool_calls && aiMsg.tool_calls.length > 0) {
@@ -193,7 +205,7 @@ Deno.serve(async (req) => {
               {
                 role: "tool",
                 tool_call_id: call.id,
-                content: JSON.stringify({ status: "success", message: "Agendamento gravado." }),
+                content: JSON.stringify({ status: "success" }),
               }
             ];
 
@@ -206,27 +218,23 @@ Deno.serve(async (req) => {
               body: JSON.stringify({
                 model: cfg.model || "gpt-4o",
                 messages: confirmMessages,
-                temperature: 0.3,
+                response_format: { type: "json_object" },
+                temperature: 0.1,
               }),
             });
             const confirmJson = await confirmRes.json();
-            finalReply = confirmJson.choices?.[0]?.message?.content || "Agendamento confirmado!";
+            const parsedConfirm = JSON.parse(confirmJson.choices?.[0]?.message?.content || "{}");
+            finalReply = parsedConfirm.reply || "Agendamento confirmado!";
+            quickReplies = parsedConfirm.quickReplies || [];
           } catch (err) {
             console.error("Tool execution failed:", err);
-            finalReply = "Tive um problema ao gravar o agendamento, mas já anotei seus dados. Nosso time entrará em contato em breve.";
+            finalReply = "Tive um problema técnico, mas já anotei seus dados. Entraremos em contato!";
           }
         }
       }
     }
 
-    // Extract Quick Replies [OPÇÕES: A, B, C]
-    const optionsMatch = finalReply.match(/\[OPÇÕES:\s*(.*?)\]/);
-    if (optionsMatch) {
-      quickReplies = optionsMatch[1].split(",").map(s => s.trim());
-      finalReply = finalReply.replace(/\[OPÇÕES:.*?\]/, "").trim();
-    }
-
-    if (!finalReply) finalReply = "Desculpe, tive um pequeno problema. Como posso ajudar?";
+    if (!finalReply) finalReply = "Desculpe, como posso ajudar?";
 
     // Save assistant message
     await supabase.from("chat_messages").insert({
@@ -240,7 +248,7 @@ Deno.serve(async (req) => {
     });
   } catch (e) {
     console.error("Edge Function Crash:", e);
-    return new Response(JSON.stringify({ error: "Houve um erro no processamento.", details: String(e) }), {
+    return new Response(JSON.stringify({ error: "Erro no processamento.", details: String(e) }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
