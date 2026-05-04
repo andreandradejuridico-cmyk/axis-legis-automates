@@ -49,30 +49,47 @@ Deno.serve(async (req) => {
     const knowledge = knowledgeRes.data || [];
     const history = (historyRes.data || []).reverse();
 
-    // 4. Construct System Prompt (Simplified & Robust)
+    // 4. Construct System Prompt
     const systemPrompt = `
-      ${cfg?.system_prompt || "Você é o assistente da Axis Legis."}
+      ${cfg?.system_prompt || "Você é o assistente sofisticado da Axis Legis."}
       
-      # INFORMAÇÕES DO SISTEMA
-      - Data/Hora Atual: ${new Date().toLocaleString('pt-BR')}
+      # CONTEXTO
+      - Data/Hora: ${new Date().toLocaleString('pt-BR')}
       - Horários: ${JSON.stringify(bh)}
-      - Ocupação: ${JSON.stringify(apps)}
+      - Agenda: ${JSON.stringify(apps)}
       
-      # BASE DE CONHECIMENTO
+      # CONHECIMENTO
       ${knowledge.map(k => `## ${k.title}\n${k.content}`).join('\n\n')}
-
-      # REGRA DE AGENDAMENTO (IMPORTANTE)
-      Se o cliente quiser agendar e fornecer Nome, Telefone e Horário, você deve confirmar os detalhes e incluir EXATAMENTE esta linha no final da sua resposta:
-      AGENDAR_REUNIAO[NOME: nome_cliente | TEL: telefone | DATA: ISO_DATE | AREA: area | ASSUNTO: assunto]
     `;
 
-    // 5. Prepare Messages
     const messages = [
       { role: "system", content: systemPrompt },
       ...history.map(m => ({ role: m.role, content: m.content }))
     ];
 
-    // 6. Call AI Gateway (Standard Mode - High Compatibility)
+    // 5. Tools Schema (Minimal & Strict)
+    const tools = [
+      {
+        type: "function",
+        function: {
+          name: "create_appointment",
+          description: "Reserva um horário na agenda.",
+          parameters: {
+            type: "object",
+            properties: {
+              contact_name: { type: "string" },
+              contact_phone: { type: "string" },
+              appointment_time: { type: "string", description: "ISO 8601" },
+              legal_area: { type: "string" },
+              subject: { type: "string" }
+            },
+            required: ["contact_name", "contact_phone", "appointment_time"]
+          }
+        }
+      }
+    ];
+
+    // 6. Request to AI Gateway
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -80,49 +97,55 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: cfg?.model || "gpt-4o-mini",
+        model: cfg?.model || "gemini-2.5-flash",
         messages: messages,
+        tools: tools,
+        tool_choice: "auto",
         temperature: Number(cfg?.temperature ?? 0.7),
       }),
     });
 
     if (!aiRes.ok) {
-      const errBody = await aiRes.text();
-      throw new Error(`Gateway Error (${aiRes.status}): ${errBody}`);
+      const errText = await aiRes.text();
+      console.error("Gateway Error:", errText);
+      // Fallback simple message if primary fails
+      return new Response(JSON.stringify({ 
+        reply: "Estou terminando de configurar minha conexão. Poderia repetir sua pergunta em alguns instantes?",
+        conversationId: conv.id 
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const aiJson = await aiRes.json();
-    let reply = aiJson.choices?.[0]?.message?.content || "";
+    const aiMsg = aiJson.choices?.[0]?.message;
+    let reply = aiMsg?.content || "";
 
-    // 7. Parse Keyword-based Booking
-    if (reply.includes("AGENDAR_REUNIAO[")) {
-      try {
-        const match = reply.match(/AGENDAR_REUNIAO\[NOME: (.*?) \| TEL: (.*?) \| DATA: (.*?) \| AREA: (.*?) \| ASSUNTO: (.*?)\]/);
-        if (match) {
-          const [_, name, tel, date, area, subject] = match;
+    // 7. Handle Tool Execution
+    if (aiMsg?.tool_calls) {
+      for (const call of aiMsg.tool_calls) {
+        if (call.function.name === "create_appointment") {
+          const args = JSON.parse(call.function.arguments);
           const { error: insErr } = await supabase.from("appointments").insert({
-            contact_name: name.trim(),
-            contact_phone: tel.trim(),
-            appointment_time: date.trim(),
-            legal_area: area.trim(),
-            subject: subject.trim(),
-            contact_email: "nao_informado@axis.com",
+            contact_name: args.contact_name,
+            contact_phone: args.contact_phone,
+            appointment_time: args.appointment_time,
+            legal_area: args.legal_area || "Geral",
+            subject: args.subject || "Reunião Inicial",
+            contact_email: "cliente@axislegis.com.br",
             status: "pending"
           });
           
           if (!insErr) {
-            // Remove a tag técnica da resposta final para o usuário
-            reply = reply.replace(/AGENDAR_REUNIAO\[.*?\]/, "").trim();
+            reply = reply || `Perfeito, ${args.contact_name}! Seu agendamento para ${new Date(args.appointment_time).toLocaleString('pt-BR')} foi registrado.`;
           }
         }
-      } catch (e) {
-        console.error("Parse error:", e);
       }
     }
 
-    if (!reply) throw new Error("AI returned empty response");
+    if (!reply && !aiMsg?.tool_calls) {
+      reply = "Como posso ajudar você hoje na Axis Legis?";
+    }
 
-    // 8. Save assistant message
+    // 8. Save and Return
     await supabase.from("chat_messages").insert({
       conversation_id: conv.id,
       role: "assistant",
