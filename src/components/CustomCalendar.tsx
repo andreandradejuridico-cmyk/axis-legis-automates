@@ -6,6 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 type Holiday = {
   date: string;
@@ -21,6 +24,8 @@ type Event = {
   description?: string;
 };
 
+import { supabase } from '@/integrations/supabase/client';
+
 type Appointment = {
   id: string;
   contact_name: string;
@@ -31,8 +36,15 @@ type Appointment = {
 export const CustomCalendar = ({ appointments = [] }: { appointments?: Appointment[] }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [localHolidays, setLocalHolidays] = useState<Holiday[]>([]);
   const [loadingHolidays, setLoadingHolidays] = useState(false);
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear().toString());
+
+  // New local holiday form state
+  const [newHolidayName, setNewHolidayName] = useState('');
+  const [newHolidayDate, setNewHolidayDate] = useState('');
+  const [newHolidayType, setNewHolidayType] = useState('municipal');
+  const [isAddingHoliday, setIsAddingHoliday] = useState(false);
 
   const events: Event[] = appointments.map(app => ({
     id: app.id,
@@ -41,21 +53,56 @@ export const CustomCalendar = ({ appointments = [] }: { appointments?: Appointme
     type: 'appointment'
   }));
 
-
-  // Fetch National Holidays from Brasil API
   const fetchHolidays = async (year: string) => {
     setLoadingHolidays(true);
     try {
+      // 1. National Holidays
       const response = await fetch(`https://brasilapi.com.br/api/feriados/v1/${year}`);
-      if (!response.ok) throw new Error('Falha ao carregar feriados');
-      const data = await response.json();
-      setHolidays(data.map((h: any) => ({ ...h, type: 'nacional' })));
-      toast.success(`Feriados de ${year} carregados!`);
+      let natHols = [];
+      if (response.ok) {
+        natHols = await response.json();
+      }
+
+      // 2. Local Holidays (State/Municipal) from Supabase
+      const { data: localData } = await supabase
+        .from('local_holidays')
+        .select('*')
+        .gte('holiday_date', `${year}-01-01`)
+        .lte('holiday_date', `${year}-12-31`);
+
+      setHolidays(natHols.map((h: any) => ({ ...h, type: 'nacional' })));
+      
+      if (localData) {
+        setLocalHolidays(localData.map(h => ({
+          date: h.holiday_date,
+          name: h.name,
+          type: h.type
+        })));
+      }
     } catch (error) {
       console.error(error);
-      toast.error('Erro ao buscar feriados. Usando apenas agendamentos.');
     } finally {
       setLoadingHolidays(false);
+    }
+  };
+
+  const addLocalHoliday = async () => {
+    if (!newHolidayName || !newHolidayDate) return toast.error("Preencha nome e data.");
+    
+    const { error } = await supabase.from('local_holidays').insert({
+      name: newHolidayName,
+      holiday_date: newHolidayDate,
+      type: newHolidayType
+    });
+
+    if (error) {
+      toast.error("Erro ao adicionar feriado local.");
+    } else {
+      toast.success("Feriado adicionado!");
+      setNewHolidayName('');
+      setNewHolidayDate('');
+      setIsAddingHoliday(false);
+      fetchHolidays(selectedYear); // Refresh
     }
   };
 
@@ -63,7 +110,7 @@ export const CustomCalendar = ({ appointments = [] }: { appointments?: Appointme
     fetchHolidays(selectedYear);
   }, [selectedYear]);
 
-  // Combine events and holidays
+  // Combine events, national holidays, and local holidays
   const allEvents: Event[] = [
     ...events,
     ...holidays.map(h => ({
@@ -71,6 +118,13 @@ export const CustomCalendar = ({ appointments = [] }: { appointments?: Appointme
       title: h.name,
       date: parseISO(h.date),
       type: 'holiday' as const,
+      description: `Feriado ${h.type}`
+    })),
+    ...localHolidays.map(h => ({
+      id: `lhol-${h.date}-${h.name}`,
+      title: h.name,
+      date: parseISO(h.date),
+      type: 'custom' as const,
       description: `Feriado ${h.type}`
     }))
   ];
@@ -128,6 +182,43 @@ export const CustomCalendar = ({ appointments = [] }: { appointments?: Appointme
                 <ChevronRight size={18} />
               </Button>
             </div>
+            
+            <Dialog open={isAddingHoliday} onOpenChange={setIsAddingHoliday}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="bg-white/10 text-white border-white/20 hover:bg-white/20">
+                  + Feriado Local
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-card text-foreground border-border sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Adicionar Feriado Local/Estadual</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Nome do Feriado</Label>
+                    <Input value={newHolidayName} onChange={e => setNewHolidayName(e.target.value)} placeholder="Ex: Aniversário da Cidade" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Data</Label>
+                    <Input type="date" value={newHolidayDate} onChange={e => setNewHolidayDate(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Tipo</Label>
+                    <Select value={newHolidayType} onValueChange={setNewHolidayType}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="estadual">Estadual</SelectItem>
+                        <SelectItem value="municipal">Municipal</SelectItem>
+                        <SelectItem value="custom">Outro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button onClick={addLocalHoliday} className="w-full">Adicionar Feriado</Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
       </CardHeader>
@@ -189,6 +280,7 @@ export const CustomCalendar = ({ appointments = [] }: { appointments?: Appointme
             <Info size={14} className="text-bronze" /> Legenda:
           </div>
           <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-500" /> Feriados Nacionais (Brasil API)</div>
+          <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-charcoal" /> Feriados Locais</div>
           <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-blue-500" /> Agendamentos IA</div>
           <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-bronze" /> Dia Atual</div>
         </div>

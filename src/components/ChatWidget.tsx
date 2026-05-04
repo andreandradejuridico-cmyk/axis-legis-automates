@@ -63,10 +63,15 @@ const ChatWidget = () => {
         content: data.reply,
         quickReplies: data.quickReplies || [] 
       }]);
-    } catch (e) {
+    } catch (e: any) {
+      console.error("ChatWidget error:", e);
+      // Extrair mensagem de erro se disponível para ajudar no debug
+      const errDetail = e?.message || e?.error || "Erro desconhecido";
+      console.log("Detalhes do erro:", errDetail);
+      
       setMessages((m) => [
         ...m,
-        { role: "assistant", content: "Desculpe, houve um erro. Tente novamente em instantes." },
+        { role: "assistant", content: "Desculpe, o servidor está indisponível no momento. Se o problema persistir, contate o administrador." },
       ]);
     } finally {
       setLoading(false);
