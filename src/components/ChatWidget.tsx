@@ -57,7 +57,20 @@ const ChatWidget = () => {
       const { data, error } = await supabase.functions.invoke("chat-ai", {
         body: { sessionId: getSessionId(), message: text },
       });
+      
       if (error) throw error;
+      
+      // Se a Edge Function retornou 200 mas incluiu um erro no JSON
+      if (data && data.error) {
+        console.error("Backend Error:", data.error);
+        setMessages((m) => [...m, { 
+          role: "assistant", 
+          content: `Erro do Sistema: ${data.error}`
+        }]);
+        setLoading(false);
+        return;
+      }
+
       setMessages((m) => [...m, { 
         role: "assistant", 
         content: data.reply,
