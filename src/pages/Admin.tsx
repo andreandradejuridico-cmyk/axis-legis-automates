@@ -18,6 +18,7 @@ type AgentCfg = {
   model: string;
   system_prompt: string;
   welcome_message: string;
+  initial_options: string[];
   temperature: number;
   enabled: boolean;
 };
@@ -172,6 +173,7 @@ const Admin = () => {
         model: agent.model,
         system_prompt: agent.system_prompt,
         welcome_message: agent.welcome_message,
+        initial_options: agent.initial_options,
         temperature: agent.temperature,
         enabled: agent.enabled,
       })
@@ -666,6 +668,22 @@ const Admin = () => {
                       rows={10}
                       className="bg-background font-mono text-sm leading-relaxed rounded-xl border-border p-4 shadow-inner"
                     />
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label className="text-muted-foreground font-medium uppercase tracking-wider text-xs">
+                      Botões de Resposta Rápida (Separados por vírgula)
+                    </Label>
+                    <Input
+                      value={agent.initial_options?.join(", ") || ""}
+                      onChange={(e) => {
+                        const opts = e.target.value.split(",").map(s => s.trim()).filter(s => s !== "");
+                        setAgent({ ...agent, initial_options: opts });
+                      }}
+                      placeholder="Ex: Escritório, 3º Setor, Advogado Particular"
+                      className="bg-background h-12 rounded-xl border-border"
+                    />
+                    <p className="text-[10px] text-muted-foreground italic">Estes botões aparecerão automaticamente para o cliente no início da conversa.</p>
                   </div>
                   
                   <div className="space-y-6 pt-4 bg-muted/30 p-6 rounded-2xl border border-border/50">

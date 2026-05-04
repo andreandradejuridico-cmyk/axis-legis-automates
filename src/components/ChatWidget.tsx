@@ -21,6 +21,7 @@ const getSessionId = () => {
 const ChatWidget = () => {
   const [open, setOpen] = useState(false);
   const [welcome, setWelcome] = useState("Olá. Como posso ajudar?");
+  const [initialOptions, setInitialOptions] = useState<string[]>([]);
   const [agentName, setAgentName] = useState("Axis IA");
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -30,13 +31,14 @@ const ChatWidget = () => {
   useEffect(() => {
     supabase
       .from("ai_agent_config")
-      .select("welcome_message, agent_name, enabled")
+      .select("welcome_message, agent_name, initial_options, enabled")
       .eq("enabled", true)
       .maybeSingle()
       .then(({ data }) => {
         if (data) {
           setWelcome(data.welcome_message);
           setAgentName(data.agent_name);
+          setInitialOptions(data.initial_options || []);
         }
       });
   }, []);
@@ -125,6 +127,20 @@ const ChatWidget = () => {
               <div className="bg-bronze/10 border border-bronze/20 text-primary-foreground/90 text-sm rounded-lg px-3 py-2.5">
                 {welcome}
               </div>
+              {messages.length === 0 && initialOptions.length > 0 && (
+                <div className="flex flex-wrap gap-2 justify-start pl-2">
+                  {initialOptions.map((reply, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => send(reply)}
+                      disabled={loading}
+                      className="bg-primary border border-bronze/40 text-bronze-light hover:bg-bronze hover:text-accent-foreground transition-all px-3 py-1.5 rounded-full text-xs font-medium shadow-sm"
+                    >
+                      {reply}
+                    </button>
+                  ))}
+                </div>
+              )}
               {messages.map((m, i) => (
                 <div key={i} className="space-y-2">
                   <div
