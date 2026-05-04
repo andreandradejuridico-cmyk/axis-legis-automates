@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
       ...history.map(m => ({ role: m.role, content: m.content }))
     ];
 
-    // 5. Tools Schema (Minimal & Strict)
+    // 5. Tools Schema
     const tools = [
       {
         type: "function",
@@ -89,7 +89,18 @@ Deno.serve(async (req) => {
       }
     ];
 
-    // 6. Request to AI Gateway
+    // 6. Map Model Name for 2026 Gateway Compatibility
+    let modelName = cfg?.model || "google/gemini-2.5-flash";
+    if (!modelName.includes("/")) {
+      if (modelName.includes("gemini")) modelName = `google/${modelName}`;
+      else if (modelName.includes("gpt")) modelName = `openai/${modelName}`;
+    }
+    // Map legacy GPT-4 to GPT-5
+    if (modelName.includes("gpt-4")) modelName = "openai/gpt-5-mini";
+
+    console.log("Calling AI Gateway with model:", modelName);
+
+    // 7. Request to AI Gateway
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -97,7 +108,7 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: cfg?.model || "gemini-2.5-flash",
+        model: modelName,
         messages: messages,
         tools: tools,
         tool_choice: "auto",
@@ -107,10 +118,9 @@ Deno.serve(async (req) => {
 
     if (!aiRes.ok) {
       const errText = await aiRes.text();
-      console.error("Gateway Error:", errText);
-      // Fallback simple message if primary fails
+      console.error("Gateway Error Detail:", errText);
       return new Response(JSON.stringify({ 
-        reply: "Estou terminando de configurar minha conexão. Poderia repetir sua pergunta em alguns instantes?",
+        reply: "Estou ajustando minha sintonia com o servidor. Por favor, tente novamente em 10 segundos.",
         conversationId: conv.id 
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -119,7 +129,7 @@ Deno.serve(async (req) => {
     const aiMsg = aiJson.choices?.[0]?.message;
     let reply = aiMsg?.content || "";
 
-    // 7. Handle Tool Execution
+    // 8. Handle Tool Execution
     if (aiMsg?.tool_calls) {
       for (const call of aiMsg.tool_calls) {
         if (call.function.name === "create_appointment") {
@@ -136,6 +146,8 @@ Deno.serve(async (req) => {
           
           if (!insErr) {
             reply = reply || `Perfeito, ${args.contact_name}! Seu agendamento para ${new Date(args.appointment_time).toLocaleString('pt-BR')} foi registrado.`;
+          } else {
+            console.error("Insert Error:", insErr);
           }
         }
       }
@@ -145,7 +157,7 @@ Deno.serve(async (req) => {
       reply = "Como posso ajudar você hoje na Axis Legis?";
     }
 
-    // 8. Save and Return
+    // 9. Save and Return
     await supabase.from("chat_messages").insert({
       conversation_id: conv.id,
       role: "assistant",
