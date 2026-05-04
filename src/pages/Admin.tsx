@@ -29,6 +29,8 @@ type WaCfg = {
   instance_name: string | null;
   default_number: string | null;
   connected: boolean;
+  api_url: string | null;
+  api_key: string | null;
 };
 
 type Conv = {
