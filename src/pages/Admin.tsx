@@ -66,6 +66,14 @@ type BusinessHour = {
   is_closed: boolean;
 };
 
+type Knowledge = {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  is_active: boolean;
+};
+
 const Admin = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -78,6 +86,7 @@ const Admin = () => {
   const [selectedConv, setSelectedConv] = useState<Conv | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [knowledge, setKnowledge] = useState<Knowledge[]>([]);
 
   const [isAdmin, setIsAdmin] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
@@ -110,12 +119,13 @@ const Admin = () => {
       }
     }
 
-    const [a, w, c, app, bh] = await Promise.all([
+    const [a, w, c, app, bh, k] = await Promise.all([
       adminCheck ? supabase.from("ai_agent_config").select("*").order("created_at", { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null, error: null }),
       adminCheck ? supabase.from("whatsapp_settings").select("*").order("created_at", { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null, error: null }),
       supabase.from("chat_conversations").select("*", { count: 'exact' }).order("created_at", { ascending: false }).limit(20),
       supabase.from("appointments").select("*").order("appointment_time", { ascending: true }),
       supabase.from("business_hours").select("*").order("day_of_week", { ascending: true }),
+      adminCheck ? supabase.from("agent_knowledge").select("*").order("created_at", { ascending: false }) : Promise.resolve({ data: null, error: null }),
     ]);
 
     if (c.error) console.error("Error fetching conversations:", c.error);
@@ -126,6 +136,7 @@ const Admin = () => {
     setConversations((c.data as any) ?? []);
     setAppointments((app.data as any) ?? []);
     setBusinessHours((bh.data as any) ?? []);
+    setKnowledge((k.data as any) ?? []);
     setLoading(false);
   };
 
@@ -211,6 +222,43 @@ const Admin = () => {
     toast.success("Horários de funcionamento atualizados.");
   };
 
+  const addKnowledge = async () => {
+    const { data, error } = await supabase.from("agent_knowledge").insert({
+      title: "Novo Tópico",
+      content: "Conteúdo aqui...",
+      category: "Geral"
+    }).select().single();
+    
+    if (error) {
+      toast.error("Erro ao adicionar: " + error.message);
+    } else {
+      setKnowledge([data as Knowledge, ...knowledge]);
+      toast.success("Tópico adicionado.");
+    }
+  };
+
+  const saveKnowledgeItem = async (item: Knowledge) => {
+    setSaving(true);
+    const { error } = await supabase.from("agent_knowledge").update({
+      title: item.title,
+      content: item.content,
+      category: item.category,
+      is_active: item.is_active
+    }).eq("id", item.id);
+    setSaving(false);
+    if (error) toast.error(error.message);
+    else toast.success("Conteúdo atualizado.");
+  };
+
+  const deleteKnowledge = async (id: string) => {
+    const { error } = await supabase.from("agent_knowledge").delete().eq("id", id);
+    if (error) toast.error(error.message);
+    else {
+      setKnowledge(knowledge.filter(k => k.id !== id));
+      toast.success("Removido.");
+    }
+  };
+
   const dayNames = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 
   const logout = async () => {
@@ -235,6 +283,7 @@ const Admin = () => {
     { id: "hours", icon: Clock, label: "Horários", show: isAdmin },
     { id: "conversations", icon: MessageSquare, label: "Conversas", show: true },
     { id: "agent", icon: Bot, label: "Agente IA", show: isAdmin && !!agent },
+    { id: "knowledge", icon: Users, label: "Conhecimento", show: isAdmin },
     { id: "whatsapp", icon: Smartphone, label: "WhatsApp", show: isAdmin && !!wa },
     { id: "users", icon: Users, label: "Permissões", show: isAdmin },
   ];
@@ -784,6 +833,98 @@ const Admin = () => {
                   </div>
                 </CardContent>
               </Card>
+            </div>
+          )}
+
+          {/* SECTION: CONHECIMENTO */}
+          {activeSection === "knowledge" && isAdmin && (
+            <div className="animate-fade-in max-w-5xl space-y-6">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-xl font-serif text-navy">Base de Conhecimento</h3>
+                  <p className="text-sm text-muted-foreground">Adicione informações que o agente usará como fonte da verdade.</p>
+                </div>
+                <Button onClick={addKnowledge} className="bg-bronze hover:bg-bronze-glow text-accent-foreground">
+                  + Adicionar Tópico
+                </Button>
+              </div>
+
+              <div className="grid gap-6">
+                {knowledge.map((item, idx) => (
+                  <Card key={item.id} className="border-border/50 shadow-card bg-card/50 backdrop-blur-sm overflow-hidden">
+                    <CardContent className="p-6">
+                      <div className="flex gap-6">
+                        <div className="flex-1 space-y-4">
+                          <div className="grid md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Título do Assunto</Label>
+                              <Input 
+                                value={item.title} 
+                                onChange={(e) => {
+                                  const newK = [...knowledge];
+                                  newK[idx].title = e.target.value;
+                                  setKnowledge(newK);
+                                }}
+                                className="bg-background border-border"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Categoria</Label>
+                              <Input 
+                                value={item.category} 
+                                onChange={(e) => {
+                                  const newK = [...knowledge];
+                                  newK[idx].category = e.target.value;
+                                  setKnowledge(newK);
+                                }}
+                                className="bg-background border-border"
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Conteúdo Detalhado</Label>
+                            <Textarea 
+                              value={item.content} 
+                              rows={4}
+                              onChange={(e) => {
+                                const newK = [...knowledge];
+                                newK[idx].content = e.target.value;
+                                setKnowledge(newK);
+                              }}
+                              className="bg-background border-border resize-none"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between pt-2">
+                            <div className="flex items-center gap-2">
+                              <Switch 
+                                checked={item.is_active} 
+                                onCheckedChange={(v) => {
+                                  const newK = [...knowledge];
+                                  newK[idx].is_active = v;
+                                  setKnowledge(newK);
+                                  saveKnowledgeItem(newK[idx]);
+                                }}
+                              />
+                              <span className="text-xs font-medium text-muted-foreground">Tópico Ativo</span>
+                            </div>
+                            <div className="flex gap-3">
+                              <Button variant="ghost" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => deleteKnowledge(item.id)}>Excluir</Button>
+                              <Button variant="secondary" size="sm" onClick={() => saveKnowledgeItem(item)}>Salvar Alterações</Button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+                
+                {knowledge.length === 0 && (
+                  <div className="p-20 text-center border-2 border-dashed border-border/50 rounded-3xl text-muted-foreground">
+                    <Bot size={48} className="mx-auto opacity-20 mb-4" />
+                    <p>Sua base de conhecimento está vazia.</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
