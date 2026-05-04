@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 
-type Msg = { role: "user" | "assistant"; content: string };
+type Msg = { role: "user" | "assistant"; content: string; quickReplies?: string[] };
 
 const SESSION_KEY = "axis_chat_session";
 
@@ -45,8 +45,8 @@ const ChatWidget = () => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, loading]);
 
-  const send = async () => {
-    const text = input.trim();
+  const send = async (textOverride?: string) => {
+    const text = (textOverride || input).trim();
     if (!text || loading) return;
     setInput("");
     setMessages((m) => [...m, { role: "user", content: text }]);
@@ -56,7 +56,11 @@ const ChatWidget = () => {
         body: { sessionId: getSessionId(), message: text },
       });
       if (error) throw error;
-      setMessages((m) => [...m, { role: "assistant", content: data.reply }]);
+      setMessages((m) => [...m, { 
+        role: "assistant", 
+        content: data.reply,
+        quickReplies: data.quickReplies 
+      }]);
     } catch (e) {
       setMessages((m) => [
         ...m,
@@ -117,20 +121,35 @@ const ChatWidget = () => {
               </button>
             </div>
 
-            <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
               <div className="bg-bronze/10 border border-bronze/20 text-primary-foreground/90 text-sm rounded-lg px-3 py-2.5">
                 {welcome}
               </div>
               {messages.map((m, i) => (
-                <div
-                  key={i}
-                  className={`max-w-[85%] text-sm rounded-lg px-3 py-2.5 ${
-                    m.role === "user"
-                      ? "ml-auto bg-bronze text-accent-foreground"
-                      : "bg-primary-foreground/10 text-primary-foreground"
-                  }`}
-                >
-                  {m.content}
+                <div key={i} className="space-y-2">
+                  <div
+                    className={`max-w-[85%] text-sm rounded-lg px-3 py-2.5 ${
+                      m.role === "user"
+                        ? "ml-auto bg-bronze text-accent-foreground"
+                        : "bg-primary-foreground/10 text-primary-foreground"
+                    }`}
+                  >
+                    {m.content}
+                  </div>
+                  {m.quickReplies && i === messages.length - 1 && (
+                    <div className="flex flex-wrap gap-2 justify-start pl-2">
+                      {m.quickReplies.map((reply, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => send(reply)}
+                          disabled={loading}
+                          className="bg-primary border border-bronze/40 text-bronze-light hover:bg-bronze hover:text-accent-foreground transition-all px-3 py-1.5 rounded-full text-xs font-medium shadow-sm"
+                        >
+                          {reply}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
               {loading && (

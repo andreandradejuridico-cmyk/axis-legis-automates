@@ -90,11 +90,11 @@ Deno.serve(async (req) => {
       - Horários de Funcionamento: ${JSON.stringify(bh)}
       - Agendamentos existentes: ${JSON.stringify(apps)}
       
-      # REGRAS CRÍTICAS DE AGENDA
-      1. NUNCA mostre o código 'book_appointment' para o usuário. Use a função internamente.
-      2. Se o usuário quiser agendar, peça: Nome, WhatsApp, Área Jurídica e Assunto.
-      3. Só confirme se o horário estiver livre e dentro do funcionamento.
-      4. IMPORTANTE: Para a data, use o formato ISO (ex: 2024-05-04T14:00:00).
+      # REGRAS CRÍTICAS DE CONVERSA
+      1. FRAGMENTAÇÃO: Faça APENAS UMA pergunta por vez. Não peça todos os dados de uma vez.
+      2. BOTÕES: Quando oferecer opções claras, use o formato [OPÇÕES: Opção 1, Opção 2] no FINAL da mensagem para gerar botões.
+      3. NUNCA mostre o código 'book_appointment' para o usuário.
+      4. Colete: Nome -> WhatsApp -> Área Jurídica (use botões) -> Assunto -> Horário.
     `;
 
     // Load history
@@ -161,6 +161,7 @@ Deno.serve(async (req) => {
     if (!aiMsg) throw new Error("No message returned from AI");
 
     let finalReply = aiMsg.content || "";
+    let quickReplies: string[] = [];
 
     // Handle Tool Calls
     if (aiMsg.tool_calls && aiMsg.tool_calls.length > 0) {
@@ -214,6 +215,13 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Extract Quick Replies [OPÇÕES: A, B, C]
+    const optionsMatch = finalReply.match(/\[OPÇÕES:\s*(.*?)\]/);
+    if (optionsMatch) {
+      quickReplies = optionsMatch[1].split(",").map(s => s.trim());
+      finalReply = finalReply.replace(/\[OPÇÕES:.*?\]/, "").trim();
+    }
+
     if (!finalReply) finalReply = "Desculpe, tive um pequeno problema. Como posso ajudar?";
 
     // Save assistant message
@@ -223,7 +231,7 @@ Deno.serve(async (req) => {
       content: finalReply,
     });
 
-    return new Response(JSON.stringify({ reply: finalReply, conversationId: conv.id }), {
+    return new Response(JSON.stringify({ reply: finalReply, conversationId: conv.id, quickReplies }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
