@@ -14,6 +14,8 @@
 - [x] Integração da IA com `tool_calling` para agendamentos.
 - [x] Implementação de **Modo JSON** na IA para suporte a Botões (Quick Replies).
 - [x] Fluxo de atendimento fragmentado (uma pergunta por vez).
+- [x] **Base de Conhecimento (RAG):** Criação da tabela `agent_knowledge` e interface Admin.
+- [x] **Refatoração do Agente IA:** Regras de negócio movidas para o banco de dados (controle total via Admin).
 
 ### 🚀 Fase 3: Notificações & Multi-Canal
 - [ ] Integração com Evolution API (WhatsApp) para lembretes automáticos.

@@ -31,3 +31,8 @@
 - **D-1 Reminder:** Sent 24 hours before the appointment.
 - **D-0 Reminder:** Sent on the day of the appointment (e.g., 2 hours before).
 - Channels: WhatsApp (Evolution API) and Email.
+
+## 5. Agent Knowledge & Admin Control
+- **Knowledge Base (RAG):** Admins can add custom topics (`agent_knowledge`) to serve as a source of truth for the AI agent.
+- **System Prompt Control:** The AI's system prompt and core interaction rules must be fully editable via the Admin Dashboard, avoiding hardcoded business rules in the Edge Functions.
+- **Conversation History:** The agent must retain context of the current session to ensure fluid conversations.

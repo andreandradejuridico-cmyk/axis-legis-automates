@@ -23,7 +23,11 @@ The application follows a standard Single Page Application (SPA) architecture co
 ## Data Flow (Chat Example)
 1. **Frontend**: User types message in `ChatWidget.tsx`.
 2. **RPC**: Frontend invokes `chat-ai` edge function via Supabase JS client.
-3. **Backend**: `chat-ai` function inserts user message into DB, fetches conversation history.
-4. **External Call**: `chat-ai` function calls Lovable AI Gateway to generate a response.
+3. **Backend Context Loading**: `chat-ai` function inserts user message into DB, then fetches:
+   - Conversation history (`chat_messages`).
+   - Agent Configuration (`ai_agent_config`).
+   - Appointments and Business Hours.
+   - Knowledge Base (`agent_knowledge`).
+4. **External Call**: `chat-ai` function constructs a dynamic system prompt with the gathered context and calls Lovable AI Gateway to generate a response.
 5. **Backend**: AI response is saved to DB.
 6. **Frontend**: Edge function returns response to frontend to render.
