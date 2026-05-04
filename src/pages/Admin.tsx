@@ -630,13 +630,16 @@ const Admin = () => {
                       />
                     </div>
                     <div className="space-y-3">
-                      <Label className="text-muted-foreground font-medium uppercase tracking-wider text-xs">Motor de IA</Label>
+                      <Label className="text-muted-foreground font-medium uppercase tracking-wider text-xs">Motor de IA (Modelo)</Label>
                       <Input
                         value={agent.model}
                         onChange={(e) => setAgent({ ...agent, model: e.target.value })}
-                        placeholder="google/gemini-2.5-flash"
+                        placeholder="Ex: gpt-4o"
                         className="bg-background font-mono text-sm h-12 rounded-xl border-border"
                       />
+                      <p className="text-[10px] text-muted-foreground italic">
+                        Você pode usar qualquer modelo suportado. Ex: <span className="font-mono bg-muted px-1 rounded">gpt-4o</span>, <span className="font-mono bg-muted px-1 rounded">gpt-4o-mini</span>, <span className="font-mono bg-muted px-1 rounded">claude-3-5-sonnet-20240620</span>.
+                      </p>
                     </div>
                   </div>
                   
