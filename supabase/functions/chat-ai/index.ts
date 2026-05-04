@@ -84,7 +84,7 @@ ${knowledge.map((k) => `## ${k.title}\n${k.content}`).join("\n\n")}
 
 # REGRAS DE RESPOSTA
 - Seja conciso (2-4 frases por turno).
-- Quando for útil, ofereça opções rápidas para o usuário (até 4) chamando a função "suggest_quick_replies".
+- OBRIGATÓRIO: Você deve SEMPRE oferecer de 2 a 4 opções rápidas para o usuário chamando a função "suggest_quick_replies" em TODAS as suas respostas. Use botões como "Agendar Reunião", "Áreas de Atuação", "Falar com Advogado", etc.
 - Para agendar, primeiro colete: nome completo, telefone (com DDD), e-mail, área jurídica, assunto e horário desejado. Só então chame "create_appointment".
 - IMPORTANTE NO AGENDAMENTO: Certifique-se de que o horário gravado seja EXATAMENTE o que o usuário pediu no fuso de São Paulo (UTC-3).
 - Nunca invente e-mail, telefone ou nome do contato. Se faltar dado, pergunte.
