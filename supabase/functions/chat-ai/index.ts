@@ -198,7 +198,6 @@ Deno.serve(async (req) => {
 
             if (bookError) throw bookError;
 
-            // Second turn to confirm to user
             const confirmMessages = [
               ...messages,
               aiMsg,
@@ -242,6 +241,11 @@ Deno.serve(async (req) => {
       role: "assistant",
       content: finalReply,
     });
+
+    // DIAGNÓSTICO: Forçar botões se estiverem vazios
+    if (!quickReplies || quickReplies.length === 0) {
+      quickReplies = ["Escritório de Advocacia", "3º Setor", "Advogado Particular"];
+    }
 
     return new Response(JSON.stringify({ reply: finalReply, conversationId: conv.id, quickReplies }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
