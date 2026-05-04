@@ -61,7 +61,7 @@ const ChatWidget = () => {
       setMessages((m) => [...m, { 
         role: "assistant", 
         content: data.reply,
-        quickReplies: data.quickReplies 
+        quickReplies: data.quickReplies || [] 
       }]);
     } catch (e) {
       setMessages((m) => [
