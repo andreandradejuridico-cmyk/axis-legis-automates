@@ -69,7 +69,30 @@ Deno.serve(async (req) => {
       ...history.map(m => ({ role: m.role, content: m.content }))
     ];
 
-    // 6. Call AI Gateway
+    // 6. Define Tools
+    const tools = [
+      {
+        type: "function",
+        function: {
+          name: "create_appointment",
+          description: "Cria um novo agendamento de reunião no banco de dados.",
+          parameters: {
+            type: "object",
+            properties: {
+              contact_name: { type: "string", description: "Nome completo do cliente" },
+              contact_email: { type: "string", description: "Email do cliente" },
+              contact_phone: { type: "string", description: "Telefone/WhatsApp do cliente" },
+              appointment_time: { type: "string", description: "Data e hora ISO (ex: 2024-05-10T14:00:00Z)" },
+              legal_area: { type: "string", description: "Área jurídica de interesse" },
+              subject: { type: "string", description: "Assunto breve da reunião" }
+            },
+            required: ["contact_name", "contact_phone", "appointment_time"]
+          }
+        }
+      }
+    ];
+
+    // 7. Call AI Gateway
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -79,6 +102,8 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: (cfg?.model && !cfg.model.includes('2.5-flash')) ? cfg.model : "gpt-4o-mini",
         messages: messages,
+        tools: tools,
+        tool_choice: "auto",
         temperature: Number(cfg?.temperature ?? 0.7),
       }),
     });
@@ -90,14 +115,40 @@ Deno.serve(async (req) => {
     }
 
     const aiJson = await aiRes.json();
-    const reply = aiJson.choices?.[0]?.message?.content;
+    const aiMsg = aiJson.choices?.[0]?.message;
+    let reply = aiMsg?.content || "";
 
-    if (!reply) {
+    // 8. Handle Tool Calls
+    if (aiMsg?.tool_calls) {
+      for (const call of aiMsg.tool_calls) {
+        if (call.function.name === "create_appointment") {
+          const args = JSON.parse(call.function.arguments);
+          const { error: insErr } = await supabase.from("appointments").insert({
+            contact_name: args.contact_name,
+            contact_email: args.contact_email,
+            contact_phone: args.contact_phone,
+            appointment_time: args.appointment_time,
+            legal_area: args.legal_area,
+            subject: args.subject,
+            status: "pendente"
+          });
+          
+          if (insErr) {
+            console.error("Error creating appointment:", insErr);
+            reply = "Desculpe, tive um problema técnico ao tentar agendar. Poderia repetir o horário?";
+          } else {
+            reply = reply || `Perfeito! Seu agendamento foi confirmado para ${new Date(args.appointment_time).toLocaleString('pt-BR')}.`;
+          }
+        }
+      }
+    }
+
+    if (!reply && !aiMsg?.tool_calls) {
       console.error("AI returned empty content:", aiJson);
       throw new Error("AI returned empty response");
     }
 
-    // 7. Save assistant message
+    // 9. Save assistant message
     await supabase.from("chat_messages").insert({
       conversation_id: conv.id,
       role: "assistant",

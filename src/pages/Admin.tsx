@@ -764,10 +764,54 @@ const Admin = () => {
                     </div>
                   </div>
 
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <Label className="text-muted-foreground font-medium uppercase tracking-wider text-xs">Instância Evolution</Label>
+                      <Input 
+                        value={wa.instance_name || ""} 
+                        onChange={(e) => setWa({ ...wa, instance_name: e.target.value })}
+                        placeholder="Ex: AxisLegis_01"
+                        className="bg-background border-border"
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-muted-foreground font-medium uppercase tracking-wider text-xs">API Key (Token)</Label>
+                      <Input 
+                        type="password"
+                        value={wa.api_key || ""} 
+                        onChange={(e) => setWa({ ...wa, api_key: e.target.value })}
+                        placeholder="••••••••••••••••"
+                        className="bg-background border-border"
+                      />
+                    </div>
+                  </div>
+
                   <div className="space-y-3">
-                    <Label className="text-muted-foreground font-medium uppercase tracking-wider text-xs">Endpoint do Webhook (Somente Leitura)</Label>
-                    <div className="bg-[#1a1c23] text-silver p-4 rounded-xl text-sm font-mono break-all border border-[#2c303a] shadow-inner select-all">
-                      {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-webhook`}
+                    <Label className="text-muted-foreground font-medium uppercase tracking-wider text-xs">URL da Evolution API</Label>
+                    <Input 
+                      value={wa.api_url || ""} 
+                      onChange={(e) => setWa({ ...wa, api_url: e.target.value })}
+                      placeholder="https://sua-api.evolution-api.com"
+                      className="bg-background border-border"
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label className="text-muted-foreground font-medium uppercase tracking-wider text-xs">Endpoint do Webhook (Copie para a Evolution API)</Label>
+                    <div className="flex gap-2">
+                      <div className="flex-1 bg-[#1a1c23] text-silver p-4 rounded-xl text-sm font-mono break-all border border-[#2c303a] shadow-inner select-all">
+                        {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-webhook`}
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="icon"
+                        onClick={() => {
+                          navigator.clipboard.writeText(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-webhook`);
+                          toast.success("Webhook copiado!");
+                        }}
+                      >
+                        <Bot size={18} />
+                      </Button>
                     </div>
                   </div>
 
