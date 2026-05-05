@@ -75,17 +75,25 @@ Deno.serve(async (req) => {
     const systemPrompt = `
 ${cfg.system_prompt || "Você é o assistente da Axis Legis."}
 
-${cfg.rules_prompt || ""}
-
 # CONTEXTO TÉCNICO
 - Horário Atual: ${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}
 - Horários da Empresa: ${JSON.stringify(bh)}
 - Base de Conhecimento: ${knowledge.map((k) => k.content).join(" ")}
+
+# SACRED RULES (SOVEREIGN BEHAVIOR)
+${cfg.rules_prompt || ""}
+- One question at a time: NEVER ask multiple questions in one reply.
+- No Lists: Prefer narrative flow over bullet points unless explicitly requested.
+- Timezone Sovereignty: Always assume America/Sao_Paulo. Never mention UTC/Z to the user.
 `;
 
     const messages = [
       { role: "system", content: systemPrompt },
-      ...history.map((m) => ({ role: m.role, content: m.content }))
+      ...history.slice(0, -1).map((m) => ({ role: m.role, content: m.content })),
+      { 
+        role: "user", 
+        content: history[history.length - 1]?.content || message
+      }
     ];
 
     // 5. Tools Schema
@@ -101,11 +109,25 @@ ${cfg.rules_prompt || ""}
               contact_name: { type: "string" },
               contact_phone: { type: "string" },
               contact_email: { type: "string" },
-              appointment_time: { type: "string", description: "ISO 8601" },
+              appointment_time: { type: "string", description: "Formato: YYYY-MM-DD HH:mm:ss (Horário de Brasília)" },
               legal_area: { type: "string" },
               subject: { type: "string" },
             },
             required: ["contact_name", "contact_phone", "contact_email", "appointment_time", "legal_area", "subject"],
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "get_available_slots",
+          description: "Consulta horários disponíveis para uma data específica.",
+          parameters: {
+            type: "object",
+            properties: {
+              date: { type: "string", description: "Formato: YYYY-MM-DD" },
+            },
+            required: ["date"],
           },
         },
       },
@@ -154,26 +176,64 @@ ${cfg.rules_prompt || ""}
         const fnName = call.function?.name;
         const args = JSON.parse(call.function?.arguments || "{}");
 
+        if (fnName === "get_available_slots") {
+          const date = args.date; // YYYY-MM-DD
+          const dayOfWeek = new Date(date + "T12:00:00").getDay();
+          
+          const { data: businessHours } = await supabase
+            .from("business_hours")
+            .select("*")
+            .eq("day_of_week", dayOfWeek)
+            .maybeSingle();
+
+          if (!businessHours || businessHours.is_closed) {
+             reply = "Desculpe, não atendemos nesta data.";
+          } else {
+             // Buscar agendamentos do dia
+             const { data: existing } = await supabase
+               .from("appointments")
+               .select("appointment_time")
+               .gte("appointment_time", `${date} 00:00:00-03`)
+               .lte("appointment_time", `${date} 23:59:59-03`);
+
+             const booked = (existing || []).map(a => new Date(a.appointment_time).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }));
+             
+             // Gerar slots de 1h
+             const slots = [];
+             let current = businessHours.start_time.substring(0, 5);
+             const end = businessHours.end_time.substring(0, 5);
+             
+             while (current < end) {
+               if (!booked.includes(current)) slots.push(current);
+               const [h, m] = current.split(":").map(Number);
+               const next = new Date(2000, 0, 1, h + 1, m);
+               current = next.toTimeString().substring(0, 5);
+             }
+             
+             reply = `Para o dia ${new Date(date + "T12:00:00").toLocaleDateString("pt-BR")}, temos os seguintes horários: ${slots.join(", ")}. Qual prefere?`;
+          }
+        }
+
         if (fnName === "create_appointment") {
-          // Ajuste técnico de fuso para garantir Brasília no banco
-          if (args.appointment_time && !args.appointment_time.includes("-")) {
-             args.appointment_time = args.appointment_time.replace("Z", "") + "-03:00";
+          // Garantir fuso de Brasília na string pura
+          let finalTime = args.appointment_time;
+          if (!finalTime.includes("-") && !finalTime.includes("+")) {
+             finalTime = finalTime.replace("T", " ") + "-03:00";
           }
 
           const { error: insErr } = await supabase.from("appointments").insert({
             contact_name: args.contact_name,
             contact_phone: args.contact_phone,
             contact_email: args.contact_email,
-            appointment_time: args.appointment_time,
+            appointment_time: finalTime,
             legal_area: args.legal_area,
             subject: args.subject,
             status: "pending",
           });
 
           if (!insErr) {
-            // Se o agendamento deu certo, mantemos o que a IA respondeu ou geramos confirmação simples
-            const displayTime = args.appointment_time.split('T')[1]?.substring(0, 5);
-            reply = reply || `Agendamento realizado para às ${displayTime}.`;
+            const displayTime = finalTime.split(' ')[1]?.substring(0, 5) || finalTime.split('T')[1]?.substring(0, 5);
+            reply = reply || `Perfeito! Agendamento solicitado para às ${displayTime}. Posso ajudar em algo mais?`;
           }
         }
 
