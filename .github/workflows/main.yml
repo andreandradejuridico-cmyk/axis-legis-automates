@@ -1,0 +1,37 @@
+name: Build and Deploy to Hostinger
+
+on:
+  push:
+    branches:
+      - main # Ou a sua branch principal
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🚚 Checkout do Código
+        uses: actions/checkout@v4
+
+      - name: 🛠️ Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: 📦 Instalar Dependências
+        run: npm install
+
+      - name: 🏗️ Gerar Build (Transformar TSX em JS)
+        run: npm run build
+
+      - name: 🚀 Enviar para Hostinger via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          # Local onde o Vite gera os arquivos (geralmente 'dist')
+          local-dir: ./dist/ 
+          # Pasta na Hostinger (geralmente public_html)
+          server-dir: ./public_html/
