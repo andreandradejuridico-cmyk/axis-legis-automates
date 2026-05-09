@@ -34,4 +34,4 @@ jobs:
           # Local onde o Vite gera os arquivos (geralmente 'dist')
           local-dir: ./dist/ 
           # Pasta na Hostinger (geralmente public_html)
-          server-dir: ./public_html/
+          server-dir: ./
