@@ -25,7 +25,7 @@ const HeroSection = () => {
           <img
             src={logo}
             alt="Axis Legis"
-            className="w-64 md:w-80 lg:w-[420px] h-auto object-contain drop-shadow-[0_10px_40px_rgba(0,0,0,0.5)]"
+            className="w-44 md:w-52 lg:w-60 h-auto object-contain drop-shadow-[0_10px_40px_rgba(0,0,0,0.5)]"
           />
         </motion.div>
 

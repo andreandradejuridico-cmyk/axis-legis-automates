@@ -117,29 +117,51 @@ const ChatWidget = () => {
 
   return (
     <>
+      <AnimatePresence>
+        {!open && (
+          <motion.div
+            className="fixed bottom-24 right-6 z-40 bg-navy border border-bronze/40 text-white text-xs px-3.5 py-2.5 rounded-xl shadow-premium pointer-events-none hidden sm:block whitespace-nowrap"
+            initial={{ opacity: 0, y: 10, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.9 }}
+            transition={{ delay: 1.5, duration: 0.4 }}
+          >
+            <div className="flex items-center gap-2 font-sans font-semibold text-silver-light">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+              </span>
+              Como posso te ajudar hoje?
+            </div>
+            {/* Speech bubble arrow */}
+            <div className="absolute right-6 bottom-[-6px] w-3 h-3 bg-navy border-r border-b border-bronze/40 rotate-45"></div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <motion.button
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-40 flex items-center gap-3 pl-5 pr-6 py-4 rounded-full bg-bronze text-accent-foreground shadow-bronze font-sans font-semibold hover:bg-bronze-glow"
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-3 pl-4 pr-6 py-3.5 rounded-full bg-gradient-to-r from-bronze via-bronze-light to-bronze text-accent-foreground shadow-bronze font-sans font-bold hover:brightness-110 transition-all duration-300 border border-white/10"
         initial={{ scale: 0, opacity: 0 }}
         animate={{
-          scale: open ? 0 : [1, 1.06, 1],
+          scale: open ? 0 : [1, 1.04, 1],
           opacity: open ? 0 : 1,
         }}
         transition={{
           scale: open
             ? { type: "spring", stiffness: 260, damping: 20 }
-            : { duration: 2, repeat: Infinity, ease: "easeInOut" },
+            : { duration: 2.5, repeat: Infinity, ease: "easeInOut" },
           opacity: { duration: 0.4 },
         }}
-        whileHover={{ scale: 1.1 }}
+        whileHover={{ scale: 1.08 }}
         whileTap={{ scale: 0.95 }}
         aria-label="Abrir chat com atendente virtual"
       >
-        <span className="relative flex h-12 w-12 items-center justify-center">
-          <span className="absolute inset-0 rounded-full bg-bronze-light/40 animate-ping" />
-          <MessageCircle size={28} className="relative" />
+        <span className="relative flex h-10 w-10 items-center justify-center">
+          <span className="absolute inset-0 rounded-full bg-white/35 animate-ping" />
+          <MessageCircle size={24} className="relative" />
         </span>
-        <span className="hidden sm:inline text-sm tracking-wide uppercase">Atendente Virtual</span>
+        <span className="hidden sm:inline text-xs tracking-wider uppercase">Falar com Assistente</span>
       </motion.button>
 
       <AnimatePresence>
