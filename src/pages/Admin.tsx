@@ -7,11 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Loader2, LogOut, MessageSquare, Bot, Smartphone, Users, LayoutDashboard, ChevronRight, Calendar, Clock } from "lucide-react";
+import { Loader2, LogOut, MessageSquare, Bot, Smartphone, Users, LayoutDashboard, ChevronRight, Calendar, Clock, Coins, BarChart3, UserCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CustomCalendar } from "@/components/CustomCalendar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type AgentCfg = {
   id: string;
@@ -23,6 +24,10 @@ type AgentCfg = {
   initial_options: string[];
   temperature: number;
   enabled: boolean;
+  openai_api_key?: string | null;
+  gemini_api_key?: string | null;
+  openrouter_api_key?: string | null;
+  lovable_api_key?: string | null;
 };
 
 type WaCfg = {
@@ -78,6 +83,18 @@ type Knowledge = {
   is_active: boolean;
 };
 
+type TokenUsage = {
+  id: string;
+  conversation_id: string | null;
+  model: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  cost_estimate: number;
+  channel: string;
+  created_at: string;
+};
+
 const Admin = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -91,6 +108,7 @@ const Admin = () => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [knowledge, setKnowledge] = useState<Knowledge[]>([]);
+  const [tokenUsage, setTokenUsage] = useState<TokenUsage[]>([]);
 
   const [isAdmin, setIsAdmin] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
@@ -123,13 +141,14 @@ const Admin = () => {
       }
     }
 
-    const [a, w, c, app, bh, k] = await Promise.all([
+    const [a, w, c, app, bh, k, tu] = await Promise.all([
       adminCheck ? supabase.from("ai_agent_config").select("*").order("created_at", { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null, error: null }),
       adminCheck ? supabase.from("whatsapp_settings").select("*").order("created_at", { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null, error: null }),
       supabase.from("chat_conversations").select("*", { count: 'exact' }).order("created_at", { ascending: false }).limit(20),
       supabase.from("appointments").select("*").order("appointment_time", { ascending: true }).limit(100),
       supabase.from("business_hours").select("*").order("day_of_week", { ascending: true }),
       adminCheck ? supabase.from("agent_knowledge").select("*").order("created_at", { ascending: false }) : Promise.resolve({ data: null, error: null }),
+      adminCheck ? supabase.from("ai_token_usage").select("*").order("created_at", { ascending: false }).limit(200) : Promise.resolve({ data: null, error: null }),
     ]);
 
     if (c.error) console.error("Error fetching conversations:", c.error);
@@ -141,6 +160,7 @@ const Admin = () => {
     setAppointments((app.data as any) ?? []);
     setBusinessHours((bh.data as any) ?? []);
     setKnowledge((k.data as any) ?? []);
+    setTokenUsage((tu?.data as any) ?? []);
     setLoading(false);
   };
 
@@ -192,6 +212,10 @@ const Admin = () => {
         initial_options: agent.initial_options,
         temperature: agent.temperature,
         enabled: agent.enabled,
+        openai_api_key: agent.openai_api_key,
+        gemini_api_key: agent.gemini_api_key,
+        openrouter_api_key: agent.openrouter_api_key,
+        lovable_api_key: agent.lovable_api_key,
       })
       .eq("id", agent.id);
     setSaving(false);
@@ -282,12 +306,46 @@ const Admin = () => {
     );
   }
 
+  // Token Statistics Calculations
+  const totalPromptTokens = tokenUsage.reduce((acc, curr) => acc + (curr.prompt_tokens || 0), 0);
+  const totalCompletionTokens = tokenUsage.reduce((acc, curr) => acc + (curr.completion_tokens || 0), 0);
+  const totalTokens = tokenUsage.reduce((acc, curr) => acc + (curr.total_tokens || 0), 0);
+  const totalCost = tokenUsage.reduce((acc, curr) => acc + Number(curr.cost_estimate || 0), 0);
+  const totalCalls = tokenUsage.length;
+
+  const qualifiedLeads = conversations.filter(c => c.contact_name || c.contact_phone || c.contact_email);
+  const leadsCount = qualifiedLeads.length;
+
+  const usageByModel = tokenUsage.reduce((acc: Record<string, { calls: number; tokens: number; cost: number }>, curr) => {
+    const model = curr.model || "Desconhecido";
+    if (!acc[model]) {
+      acc[model] = { calls: 0, tokens: 0, cost: 0 };
+    }
+    acc[model].calls += 1;
+    acc[model].tokens += curr.total_tokens || 0;
+    acc[model].cost += Number(curr.cost_estimate || 0);
+    return acc;
+  }, {});
+
+  const usageByChannel = tokenUsage.reduce((acc: Record<string, { calls: number; tokens: number; cost: number }>, curr) => {
+    const channel = curr.channel || "web";
+    if (!acc[channel]) {
+      acc[channel] = { calls: 0, tokens: 0, cost: 0 };
+    }
+    acc[channel].calls += 1;
+    acc[channel].tokens += curr.total_tokens || 0;
+    acc[channel].cost += Number(curr.cost_estimate || 0);
+    return acc;
+  }, {});
+
   const navItems = [
     { id: "overview", icon: LayoutDashboard, label: "Visão Geral", show: true },
     { id: "agenda", icon: Calendar, label: "Agenda", show: true },
     { id: "hours", icon: Clock, label: "Horários", show: isAdmin },
     { id: "conversations", icon: MessageSquare, label: "Conversas", show: true },
+    { id: "leads", icon: UserCheck, label: "Leads Qualificados", show: isAdmin },
     { id: "agent", icon: Bot, label: "Agente IA", show: isAdmin && !!agent },
+    { id: "tokens", icon: Coins, label: "Uso de IA / Tokens", show: isAdmin },
     { id: "knowledge", icon: Users, label: "Conhecimento", show: isAdmin },
     { id: "whatsapp", icon: Smartphone, label: "WhatsApp", show: isAdmin && !!wa },
     { id: "users", icon: Users, label: "Permissões", show: isAdmin },
@@ -371,53 +429,139 @@ const Admin = () => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <Card className="shadow-card border-border/50 bg-card/50 backdrop-blur-sm rounded-2xl">
+                {/* Conversas Registradas */}
+                <Card 
+                  className="shadow-card border-border/50 bg-card/50 backdrop-blur-sm rounded-2xl cursor-pointer hover:bg-muted/30 transition-all duration-300 group"
+                  onClick={() => setActiveSection("conversations")}
+                >
                   <CardContent className="p-6">
                     <div className="flex justify-between items-start">
                        <div>
                          <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Conversas Registradas</p>
                          <h3 className="text-4xl font-bold mt-2 text-navy">{conversations.length}</h3>
+                         <p className="text-xs text-muted-foreground mt-2 group-hover:text-bronze transition-colors flex items-center gap-1">
+                           Ver todas as conversas <ChevronRight size={12} />
+                         </p>
                        </div>
-                       <div className="p-4 bg-bronze/10 rounded-2xl text-bronze"><MessageSquare size={24} /></div>
+                       <div className="p-4 bg-bronze/10 rounded-2xl text-bronze transition-transform group-hover:scale-105"><MessageSquare size={24} /></div>
                     </div>
                   </CardContent>
                 </Card>
-                
-                {isAdmin && agent && (
-                <Card className="shadow-card border-border/50 bg-card/50 backdrop-blur-sm rounded-2xl">
-                  <CardContent className="p-6">
-                    <div className="flex justify-between items-start">
-                       <div>
-                         <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Status do Agente IA</p>
-                         <h3 className="text-2xl font-bold mt-4 flex items-center gap-2">
-                           {agent.enabled 
-                             ? <><span className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></span> <span className="text-green-600">Ativo no site</span></> 
-                             : <><span className="w-3 h-3 rounded-full bg-red-500"></span> <span className="text-muted-foreground">Pausado</span></>}
-                         </h3>
-                       </div>
-                       <div className="p-4 bg-charcoal/5 rounded-2xl text-charcoal"><Bot size={24} /></div>
-                    </div>
-                  </CardContent>
-                </Card>
+
+                {/* Leads Qualificados */}
+                {isAdmin && (
+                  <Card 
+                    className="shadow-card border-border/50 bg-card/50 backdrop-blur-sm rounded-2xl cursor-pointer hover:bg-muted/30 transition-all duration-300 group"
+                    onClick={() => setActiveSection("leads")}
+                  >
+                    <CardContent className="p-6">
+                      <div className="flex justify-between items-start">
+                         <div>
+                           <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Leads Qualificados</p>
+                           <h3 className="text-4xl font-bold mt-2 text-navy">{leadsCount}</h3>
+                           <p className="text-xs text-muted-foreground mt-2 group-hover:text-bronze transition-colors flex items-center gap-1">
+                             Ver leads capturados <ChevronRight size={12} />
+                           </p>
+                         </div>
+                         <div className="p-4 bg-purple-500/10 rounded-2xl text-purple-600 transition-transform group-hover:scale-105"><UserCheck size={24} /></div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 )}
 
+                {/* Uso de Tokens */}
+                {isAdmin && (
+                  <Card 
+                    className="shadow-card border-border/50 bg-card/50 backdrop-blur-sm rounded-2xl cursor-pointer hover:bg-muted/30 transition-all duration-300 group"
+                    onClick={() => setActiveSection("tokens")}
+                  >
+                    <CardContent className="p-6">
+                      <div className="flex justify-between items-start">
+                         <div>
+                           <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Custo IA / Tokens</p>
+                           <h3 className="text-3xl font-bold mt-2 text-navy">${totalCost.toFixed(4)} USD</h3>
+                           <p className="text-xs text-muted-foreground mt-2">
+                             {totalTokens.toLocaleString()} tokens consumidos
+                           </p>
+                         </div>
+                         <div className="p-4 bg-green-500/10 rounded-2xl text-green-600 transition-transform group-hover:scale-105"><Coins size={24} /></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                
+                {/* Status do Agente IA */}
+                {isAdmin && agent && (
+                  <Card 
+                    className="shadow-card border-border/50 bg-card/50 backdrop-blur-sm rounded-2xl cursor-pointer hover:bg-muted/30 transition-all duration-300 group"
+                    onClick={() => setActiveSection("agent")}
+                  >
+                    <CardContent className="p-6">
+                      <div className="flex justify-between items-start">
+                         <div>
+                           <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Status do Agente IA</p>
+                           <h3 className="text-2xl font-bold mt-4 flex items-center gap-2">
+                             {agent.enabled 
+                               ? <><span className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></span> <span className="text-green-600">Ativo</span></> 
+                               : <><span className="w-3 h-3 rounded-full bg-red-500"></span> <span className="text-muted-foreground">Pausado</span></>}
+                           </h3>
+                           <p className="text-xs text-muted-foreground mt-2 truncate max-w-[200px]">
+                             Modelo: {agent.model.replace("google/", "").replace("openai/", "")}
+                           </p>
+                         </div>
+                         <div className="p-4 bg-blue-500/10 rounded-2xl text-blue-600 transition-transform group-hover:scale-105"><Bot size={24} /></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Conexão WhatsApp */}
                 {isAdmin && wa && (
-                <Card className="shadow-card border-border/50 bg-card/50 backdrop-blur-sm rounded-2xl">
+                  <Card 
+                    className="shadow-card border-border/50 bg-card/50 backdrop-blur-sm rounded-2xl cursor-pointer hover:bg-muted/30 transition-all duration-300 group"
+                    onClick={() => setActiveSection("whatsapp")}
+                  >
+                    <CardContent className="p-6">
+                      <div className="flex justify-between items-start">
+                         <div>
+                           <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Conexão WhatsApp</p>
+                           <h3 className="text-2xl font-bold mt-4 flex items-center gap-2">
+                             {wa.connected 
+                               ? <><span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span> <span className="text-green-600">Online</span></> 
+                               : <><span className="w-2.5 h-2.5 rounded-full bg-red-500"></span> <span className="text-red-500">Offline</span></>}
+                           </h3>
+                           <p className="text-xs text-muted-foreground mt-2 truncate max-w-[200px]">
+                             Instância: {wa.instance_name || "Nenhuma"}
+                           </p>
+                         </div>
+                         <div className="p-4 bg-emerald-500/10 rounded-2xl text-emerald-600 transition-transform group-hover:scale-105"><Smartphone size={24} /></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Próximos Compromissos / Agenda */}
+                <Card 
+                  className="shadow-card border-border/50 bg-card/50 backdrop-blur-sm rounded-2xl cursor-pointer hover:bg-muted/30 transition-all duration-300 group"
+                  onClick={() => setActiveSection("agenda")}
+                >
                   <CardContent className="p-6">
                     <div className="flex justify-between items-start">
                        <div>
-                         <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Conexão WhatsApp</p>
-                         <h3 className="text-2xl font-bold mt-4 flex items-center gap-2">
-                           {wa.connected 
-                             ? <><span className="text-green-600">Online</span></> 
-                             : <><span className="text-red-500">Offline</span></>}
+                         <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Próximo Compromisso</p>
+                         <h3 className="text-lg font-bold mt-4 truncate max-w-[200px] text-navy">
+                           {appointments.length > 0 
+                             ? new Date(appointments[0].appointment_time).toLocaleDateString("pt-BR") + " - " + appointments[0].contact_name
+                             : "Nenhum agendado"}
                          </h3>
+                         <p className="text-xs text-muted-foreground mt-2">
+                           Total de {appointments.length} agendamentos
+                         </p>
                        </div>
-                       <div className="p-4 bg-charcoal/5 rounded-2xl text-charcoal"><Smartphone size={24} /></div>
+                       <div className="p-4 bg-indigo-500/10 rounded-2xl text-indigo-600 transition-transform group-hover:scale-105"><Calendar size={24} /></div>
                     </div>
                   </CardContent>
                 </Card>
-                )}
               </div>
             </div>
           )}
@@ -564,41 +708,6 @@ const Admin = () => {
                   )}
                 </CardContent>
               </Card>
-
-              {/* Modal de Histórico */}
-              <Dialog open={!!selectedConv} onOpenChange={(o) => !o && setSelectedConv(null)}>
-                <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 overflow-hidden border-border/50 shadow-premium">
-                  <DialogHeader className="p-6 pb-4 border-b border-border/50 bg-muted/20">
-                    <DialogTitle className="font-serif text-xl text-navy">
-                      Transcrição da Conversa
-                    </DialogTitle>
-                  </DialogHeader>
-                  <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-[#f8f9fa]">
-                    {loadingMessages ? (
-                      <div className="flex items-center justify-center py-20">
-                        <Loader2 className="animate-spin text-bronze" size={32} />
-                      </div>
-                    ) : chatMessages.length === 0 ? (
-                      <p className="text-center text-muted-foreground py-20">Nenhuma mensagem salva para esta sessão.</p>
-                    ) : (
-                      chatMessages.map(msg => (
-                        <div key={msg.id} className={`flex flex-col w-fit max-w-[85%] ${msg.role === 'user' ? 'ml-auto items-end' : 'mr-auto items-start'}`}>
-                          <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest mb-1.5 px-1">
-                            {msg.role === 'user' ? 'Cliente' : 'Axis Legis IA'}
-                          </span>
-                          <div className={`p-4 rounded-2xl text-[15px] leading-relaxed shadow-sm ${
-                            msg.role === 'user' 
-                            ? 'bg-[#1a1c23] text-white rounded-tr-sm' 
-                            : 'bg-white border border-border/50 text-foreground rounded-tl-sm'
-                          }`}>
-                            {msg.content}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </DialogContent>
-              </Dialog>
             </div>
           )}
 
@@ -635,15 +744,80 @@ const Admin = () => {
                     </div>
                     <div className="space-y-3">
                       <Label className="text-muted-foreground font-medium uppercase tracking-wider text-xs">Motor de IA (Modelo)</Label>
-                      <Input
+                      <Select
                         value={agent.model}
-                        onChange={(e) => setAgent({ ...agent, model: e.target.value })}
-                        placeholder="Ex: gpt-4o"
-                        className="bg-background font-mono text-sm h-12 rounded-xl border-border"
-                      />
+                        onValueChange={(val) => setAgent({ ...agent, model: val })}
+                      >
+                        <SelectTrigger className="bg-background h-12 rounded-xl border-border">
+                          <SelectValue placeholder="Selecione o modelo do agente" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#1a1c23] border border-white/10 text-white">
+                          <SelectItem value="google/gemini-2.0-flash">Google Gemini 2.0 Flash (Padrão)</SelectItem>
+                          <SelectItem value="google/gemini-2.5-flash">Google Gemini 2.5 Flash</SelectItem>
+                          <SelectItem value="google/gemini-2.5-pro">Google Gemini 2.5 Pro</SelectItem>
+                          <SelectItem value="google/gemini-3.1-pro">Google Gemini 3.1 Pro</SelectItem>
+                          <SelectItem value="google/gemini-3.5-flash">Google Gemini 3.5 Flash</SelectItem>
+                          <SelectItem value="gpt-4o">OpenAI GPT-4o</SelectItem>
+                          <SelectItem value="gpt-4o-mini">OpenAI GPT-4o-mini</SelectItem>
+                          <SelectItem value="claude-3-5-sonnet-latest">Anthropic Claude 3.5 Sonnet</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <p className="text-[10px] text-muted-foreground italic">
-                        Você pode usar qualquer modelo suportado. Ex: <span className="font-mono bg-muted px-1 rounded">gpt-4o</span>, <span className="font-mono bg-muted px-1 rounded">gpt-4o-mini</span>, <span className="font-mono bg-muted px-1 rounded">claude-3-5-sonnet-20240620</span>.
+                        Selecione o motor de inteligência artificial de sua preferência. Cada modelo possui diferentes níveis de inteligência, velocidade e custos associados.
                       </p>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-border/50 pt-6">
+                    <h4 className="text-navy font-serif font-semibold text-base mb-4">Chaves de API Personalizadas (Opcional)</h4>
+                    <p className="text-xs text-muted-foreground mb-4">
+                      Adicione suas próprias chaves de API para utilizar modelos diretamente com suas contas do Google, OpenAI ou OpenRouter (Claude). Se deixado em branco, o sistema usará as chaves padrão do servidor.
+                    </p>
+                    
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div className="space-y-3">
+                        <Label className="text-muted-foreground font-medium uppercase tracking-wider text-xs">OpenAI API Key</Label>
+                        <Input
+                          type="password"
+                          value={agent.openai_api_key || ""}
+                          onChange={(e) => setAgent({ ...agent, openai_api_key: e.target.value || null })}
+                          placeholder="sk-proj-..."
+                          className="bg-background h-12 rounded-xl border-border"
+                        />
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <Label className="text-muted-foreground font-medium uppercase tracking-wider text-xs">Google Gemini API Key</Label>
+                        <Input
+                          type="password"
+                          value={agent.gemini_api_key || ""}
+                          onChange={(e) => setAgent({ ...agent, gemini_api_key: e.target.value || null })}
+                          placeholder="AIzaSy..."
+                          className="bg-background h-12 rounded-xl border-border"
+                        />
+                      </div>
+
+                      <div className="space-y-3">
+                        <Label className="text-muted-foreground font-medium uppercase tracking-wider text-xs">OpenRouter API Key (para Claude / Anthropic)</Label>
+                        <Input
+                          type="password"
+                          value={agent.openrouter_api_key || ""}
+                          onChange={(e) => setAgent({ ...agent, openrouter_api_key: e.target.value || null })}
+                          placeholder="sk-or-v1-..."
+                          className="bg-background h-12 rounded-xl border-border"
+                        />
+                      </div>
+
+                      <div className="space-y-3">
+                        <Label className="text-muted-foreground font-medium uppercase tracking-wider text-xs">Lovable API Key</Label>
+                        <Input
+                          type="password"
+                          value={agent.lovable_api_key || ""}
+                          onChange={(e) => setAgent({ ...agent, lovable_api_key: e.target.value || null })}
+                          placeholder="Chave customizada da Lovable"
+                          className="bg-background h-12 rounded-xl border-border"
+                        />
+                      </div>
                     </div>
                   </div>
                   
@@ -994,6 +1168,300 @@ const Admin = () => {
               </Card>
             </div>
           )}
+
+          {/* SECTION: LEADS QUALIFICADOS */}
+          {activeSection === "leads" && isAdmin && (
+            <div className="animate-fade-in space-y-6">
+              <Card className="border-border/50 shadow-card rounded-2xl overflow-hidden bg-card/50 backdrop-blur-sm">
+                <CardHeader className="p-6 border-b border-border/50 flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="font-serif text-lg text-navy">Leads Identificados pela IA</CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Clientes em potencial que forneceram informações de contato (nome, telefone ou e-mail) durante as conversas.
+                    </p>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {qualifiedLeads.length === 0 ? (
+                    <div className="p-16 text-center text-muted-foreground flex flex-col items-center">
+                      <UserCheck size={48} className="opacity-20 mb-4" />
+                      <p className="text-lg">Nenhum lead qualificado encontrado ainda.</p>
+                      <p className="text-sm mt-1">A IA salvará os dados dos contatos assim que eles realizarem agendamentos.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-border bg-muted/20 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                            <th className="p-4 pl-6">Nome / Lead</th>
+                            <th className="p-4">Canal</th>
+                            <th className="p-4">Telefone</th>
+                            <th className="p-4">E-mail</th>
+                            <th className="p-4">Data de Cadastro</th>
+                            <th className="p-4 text-right pr-6">Ações</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/50 text-sm">
+                          {qualifiedLeads.map((c) => (
+                            <tr key={c.id} className="hover:bg-muted/30 transition-colors group">
+                              <td className="p-4 pl-6">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-full bg-bronze/10 text-bronze flex items-center justify-center font-bold font-serif text-sm">
+                                    {c.contact_name ? c.contact_name.charAt(0).toUpperCase() : 'L'}
+                                  </div>
+                                  <span className="font-medium text-foreground">{c.contact_name || "Lead Sem Nome"}</span>
+                                </div>
+                              </td>
+                              <td className="p-4">
+                                <span className={`text-[10px] uppercase font-mono tracking-wider px-2 py-0.5 rounded ${
+                                  c.channel === "whatsapp" ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800"
+                                }`}>
+                                  {c.channel}
+                                </span>
+                              </td>
+                              <td className="p-4 font-mono text-xs">{c.contact_phone || "-"}</td>
+                              <td className="p-4 text-muted-foreground">{c.contact_email || "-"}</td>
+                              <td className="p-4 text-muted-foreground text-xs">
+                                {new Date(c.created_at).toLocaleString("pt-BR")}
+                              </td>
+                              <td className="p-4 text-right pr-6">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => viewHistory(c)}
+                                  className="h-9"
+                                >
+                                  Ver Transcrição
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* SECTION: USO DE TOKENS */}
+          {activeSection === "tokens" && isAdmin && (
+            <div className="animate-fade-in space-y-8">
+              {/* Resumo Geral */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <Card className="shadow-card border-border/50 bg-card/50 backdrop-blur-sm rounded-2xl">
+                  <CardContent className="p-6">
+                    <div className="flex justify-between items-start">
+                       <div>
+                         <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total de Tokens</p>
+                         <h3 className="text-3xl font-bold mt-2 text-navy">{totalTokens.toLocaleString()}</h3>
+                         <p className="text-xs text-muted-foreground mt-1">Prompt: {totalPromptTokens.toLocaleString()} | Comp: {totalCompletionTokens.toLocaleString()}</p>
+                       </div>
+                       <div className="p-4 bg-bronze/10 rounded-2xl text-bronze"><Coins size={24} /></div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-card border-border/50 bg-card/50 backdrop-blur-sm rounded-2xl">
+                  <CardContent className="p-6">
+                    <div className="flex justify-between items-start">
+                       <div>
+                         <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Custo Total Estimado</p>
+                         <h3 className="text-3xl font-bold mt-2 text-navy">${totalCost.toFixed(4)} USD</h3>
+                         <p className="text-xs text-muted-foreground mt-1">~ R$ {(totalCost * 5.15).toFixed(2)} BRL</p>
+                       </div>
+                       <div className="p-4 bg-green-500/10 rounded-2xl text-green-600"><Coins size={24} /></div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-card border-border/50 bg-card/50 backdrop-blur-sm rounded-2xl">
+                  <CardContent className="p-6">
+                    <div className="flex justify-between items-start">
+                       <div>
+                         <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total de Requisições</p>
+                         <h3 className="text-3xl font-bold mt-2 text-navy">{totalCalls}</h3>
+                         <p className="text-xs text-muted-foreground mt-1">Média de {totalCalls > 0 ? Math.round(totalTokens / totalCalls) : 0} tokens/chamada</p>
+                       </div>
+                       <div className="p-4 bg-blue-500/10 rounded-2xl text-blue-600"><BarChart3 size={24} /></div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-card border-border/50 bg-card/50 backdrop-blur-sm rounded-2xl">
+                  <CardContent className="p-6">
+                    <div className="flex justify-between items-start">
+                       <div>
+                         <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Custo Médio / Conversa</p>
+                         <h3 className="text-3xl font-bold mt-2 text-navy">
+                           ${totalCalls > 0 ? (totalCost / totalCalls).toFixed(6) : "0.00"}
+                         </h3>
+                         <p className="text-xs text-muted-foreground mt-1">Eficiência: Excelente</p>
+                       </div>
+                       <div className="p-4 bg-purple-500/10 rounded-2xl text-purple-600"><BarChart3 size={24} /></div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Tabelas de Agrupamento por Modelo e Canal */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Consumo por Modelo */}
+                <Card className="border-border/50 shadow-card rounded-2xl bg-card/50 backdrop-blur-sm">
+                  <CardHeader className="p-6 border-b border-border/50">
+                    <CardTitle className="font-serif text-lg text-navy">Consumo por Modelo de IA</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    <div className="divide-y divide-border/50">
+                      {Object.entries(usageByModel).map(([model, data]) => (
+                        <div key={model} className="py-3 flex justify-between items-center">
+                          <div>
+                            <span className="font-mono text-sm font-medium text-foreground">{model}</span>
+                            <p className="text-xs text-muted-foreground">{data.calls} chamadas</p>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-sm font-bold text-navy">{data.tokens.toLocaleString()} tokens</span>
+                            <p className="text-xs text-green-600 font-semibold">${data.cost.toFixed(5)} USD</p>
+                          </div>
+                        </div>
+                      ))}
+                      {Object.keys(usageByModel).length === 0 && (
+                        <p className="text-center text-muted-foreground py-4">Nenhum dado de modelo disponível.</p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Consumo por Canal */}
+                <Card className="border-border/50 shadow-card rounded-2xl bg-card/50 backdrop-blur-sm">
+                  <CardHeader className="p-6 border-b border-border/50">
+                    <CardTitle className="font-serif text-lg text-navy">Consumo por Canal</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    <div className="divide-y divide-border/50">
+                      {Object.entries(usageByChannel).map(([channel, data]) => (
+                        <div key={channel} className="py-3 flex justify-between items-center">
+                          <div>
+                            <span className="text-sm font-semibold capitalize text-foreground">{channel}</span>
+                            <p className="text-xs text-muted-foreground">{data.calls} chamadas</p>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-sm font-bold text-navy">{data.tokens.toLocaleString()} tokens</span>
+                            <p className="text-xs text-green-600 font-semibold">${data.cost.toFixed(5)} USD</p>
+                          </div>
+                        </div>
+                      ))}
+                      {Object.keys(usageByChannel).length === 0 && (
+                        <p className="text-center text-muted-foreground py-4">Nenhum dado de canal disponível.</p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Log Recente */}
+              <Card className="border-border/50 shadow-card rounded-2xl bg-card/50 backdrop-blur-sm overflow-hidden">
+                <CardHeader className="p-6 border-b border-border/50 flex flex-row items-center justify-between">
+                  <CardTitle className="font-serif text-lg text-navy">Logs Recentes de Uso de Tokens</CardTitle>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={async () => {
+                      setLoading(true);
+                      const { data } = await supabase.from("ai_token_usage").select("*").order("created_at", { ascending: false }).limit(200);
+                      setTokenUsage((data as any) ?? []);
+                      setLoading(false);
+                      toast.success("Logs atualizados!");
+                    }}
+                    className="h-9"
+                  >
+                    Atualizar Logs
+                  </Button>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/20 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          <th className="p-4 pl-6">Data/Hora</th>
+                          <th className="p-4">Modelo</th>
+                          <th className="p-4">Canal</th>
+                          <th className="p-4 text-right">Prompt</th>
+                          <th className="p-4 text-right">Completion</th>
+                          <th className="p-4 text-right">Total Tokens</th>
+                          <th className="p-4 text-right pr-6">Custo Estimado</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/50 text-sm">
+                        {tokenUsage.slice(0, 50).map((log) => (
+                          <tr key={log.id} className="hover:bg-muted/30 transition-colors">
+                            <td className="p-4 pl-6 text-muted-foreground text-xs">
+                              {new Date(log.created_at).toLocaleString("pt-BR")}
+                            </td>
+                            <td className="p-4 font-mono text-xs">{log.model}</td>
+                            <td className="p-4">
+                              <span className={`text-[10px] uppercase font-mono tracking-wider px-2 py-0.5 rounded ${
+                                log.channel === "whatsapp" ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800"
+                              }`}>
+                                {log.channel}
+                              </span>
+                            </td>
+                            <td className="p-4 text-right font-mono text-xs text-muted-foreground">{log.prompt_tokens.toLocaleString()}</td>
+                            <td className="p-4 text-right font-mono text-xs text-muted-foreground">{log.completion_tokens.toLocaleString()}</td>
+                            <td className="p-4 text-right font-mono text-xs font-semibold text-foreground">{log.total_tokens.toLocaleString()}</td>
+                            <td className="p-4 text-right font-mono text-xs text-green-600 font-semibold pr-6">${Number(log.cost_estimate || 0).toFixed(6)}</td>
+                          </tr>
+                        ))}
+                        {tokenUsage.length === 0 && (
+                          <tr>
+                            <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                              Nenhum log de consumo registrado ainda.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Modal de Histórico Global */}
+          <Dialog open={!!selectedConv} onOpenChange={(o) => !o && setSelectedConv(null)}>
+            <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 overflow-hidden border-border/50 shadow-premium">
+              <DialogHeader className="p-6 pb-4 border-b border-border/50 bg-muted/20">
+                <DialogTitle className="font-serif text-xl text-navy">
+                  Transcrição da Conversa
+                </DialogTitle>
+              </DialogHeader>
+              <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-[#f8f9fa]">
+                {loadingMessages ? (
+                  <div className="flex items-center justify-center py-20">
+                    <Loader2 className="animate-spin text-bronze" size={32} />
+                  </div>
+                ) : chatMessages.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-20">Nenhuma mensagem salva para esta sessão.</p>
+                ) : (
+                  chatMessages.map(msg => (
+                    <div key={msg.id} className={`flex flex-col w-fit max-w-[85%] ${msg.role === 'user' ? 'ml-auto items-end' : 'mr-auto items-start'}`}>
+                      <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest mb-1.5 px-1">
+                        {msg.role === 'user' ? 'Cliente' : 'Axis Legis IA'}
+                      </span>
+                      <div className={`p-4 rounded-2xl text-[15px] leading-relaxed shadow-sm ${
+                        msg.role === 'user' 
+                        ? 'bg-[#1a1c23] text-white rounded-tr-sm' 
+                        : 'bg-white border border-border/50 text-foreground rounded-tl-sm'
+                      }`}>
+                        {msg.content}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
 
         </div>
       </main>

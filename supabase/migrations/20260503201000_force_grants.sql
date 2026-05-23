@@ -13,4 +13,4 @@ GRANT INSERT, SELECT ON public.chat_messages TO anon;
 -- 3. Garante que as permissões de execução das funções de Admin estejam OK
 GRANT EXECUTE ON FUNCTION public.has_role(uuid, public.app_role) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_all_users() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.set_user_role(uuid, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.set_user_role(uuid, public.app_role) TO authenticated;

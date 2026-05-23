@@ -5,6 +5,28 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+function calculateCost(model: string, promptTokens: number, completionTokens: number): number {
+  const modelLower = model.toLowerCase();
+  let inputRate = 0.075; // USD per 1M tokens (Gemini Flash default)
+  let outputRate = 0.30;
+  
+  if (modelLower.includes("gpt-4o-mini")) {
+    inputRate = 0.15;
+    outputRate = 0.60;
+  } else if (modelLower.includes("gpt-4o")) {
+    inputRate = 2.50;
+    outputRate = 10.00;
+  } else if (modelLower.includes("claude-3-5-sonnet") || modelLower.includes("claude-3.5-sonnet")) {
+    inputRate = 3.00;
+    outputRate = 15.00;
+  } else if (modelLower.includes("gemini") && modelLower.includes("pro")) {
+    inputRate = 1.25;
+    outputRate = 5.00;
+  }
+  
+  return (promptTokens * inputRate + completionTokens * outputRate) / 1000000;
+}
+
 // Public webhook called by Evolution API. Persists incoming messages and
 // optionally replies via AI gateway then sends back through Evolution.
 Deno.serve(async (req) => {
@@ -59,10 +81,16 @@ Deno.serve(async (req) => {
     });
 
     // 3. Load Context & Config (Sync with chat-ai)
-    const [cfgRes, bhRes, knowledgeRes] = await Promise.all([
+    const [cfgRes, bhRes, knowledgeRes, historyRes] = await Promise.all([
       supabase.from("ai_agent_config").select("*").eq("enabled", true).maybeSingle(),
       supabase.from("business_hours").select("*"),
       supabase.from("agent_knowledge").select("title, content").eq("is_active", true),
+      supabase
+        .from("chat_messages")
+        .select("role, content")
+        .eq("conversation_id", conv!.id)
+        .order("created_at", { ascending: false })
+        .limit(10),
     ]);
 
     const cfg = cfgRes.data;
@@ -74,6 +102,17 @@ Deno.serve(async (req) => {
 
     const bh = bhRes.data || [];
     const knowledge = knowledgeRes.data || [];
+    const history = (historyRes.data || []).reverse();
+
+    // AI Optimization: Relevance-based filtering for knowledge base to reduce prompt tokens
+    const userMessageLower = (text || "").toLowerCase();
+    const relevantKnowledge = knowledge.filter((k) => {
+      if (knowledge.length <= 3) return true;
+      const titleWords = (k.title || "").toLowerCase().split(/\s+/);
+      return titleWords.some((word) => word.length > 3 && userMessageLower.includes(word)) ||
+             (k.category && userMessageLower.includes(k.category.toLowerCase()));
+    });
+    const finalKnowledge = relevantKnowledge.length > 0 ? relevantKnowledge : knowledge.slice(0, 2);
 
     // 4. Construct System Prompt (Sovereign Rules)
     const systemPrompt = `
@@ -82,7 +121,7 @@ ${cfg.system_prompt || "Você é o assistente da Axis Legis."}
 # CONTEXTO TÉCNICO
 - Horário Atual: ${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}
 - Horários da Empresa: ${JSON.stringify(bh)}
-- Base de Conhecimento: ${knowledge.map((k) => k.content).join(" ")}
+- Base de Conhecimento: ${finalKnowledge.map((k) => k.content).join(" ")}
 
 # SACRED RULES (SOVEREIGN BEHAVIOR)
 ${cfg.rules_prompt || ""}
@@ -128,14 +167,40 @@ ${cfg.rules_prompt || ""}
       },
     ];
 
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    // 6. Route to correct provider/endpoint based on model and custom keys
+    const modelName = cfg?.model || "google/gemini-2.0-flash";
+    let apiEndpoint = "https://ai.gateway.lovable.dev/v1/chat/completions";
+    let authHeader = `Bearer ${cfg?.lovable_api_key || Deno.env.get("LOVABLE_API_KEY")}`;
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    if (modelName.startsWith("gpt-") || modelName.startsWith("o1-") || modelName.startsWith("o3-")) {
+      if (cfg?.openai_api_key) {
+        apiEndpoint = "https://api.openai.com/v1/chat/completions";
+        authHeader = `Bearer ${cfg.openai_api_key}`;
+      }
+    } else if (modelName.includes("gemini")) {
+      if (cfg?.gemini_api_key) {
+        apiEndpoint = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+        authHeader = `Bearer ${cfg.gemini_api_key}`;
+      }
+    } else if (modelName.includes("anthropic/") || modelName.startsWith("claude-") || modelName.includes("/")) {
+      if (cfg?.openrouter_api_key) {
+        apiEndpoint = "https://openrouter.ai/api/v1/chat/completions";
+        authHeader = `Bearer ${cfg.openrouter_api_key}`;
+        headers["HTTP-Referer"] = "https://axis-legis.com";
+        headers["X-Title"] = "Axis Legis";
+      }
+    }
+
+    headers["Authorization"] = authHeader;
+
+    const aiRes = await fetch(apiEndpoint, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${Deno.env.get("LOVABLE_API_KEY")}`,
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify({
-        model: cfg.model || "google/gemini-2.0-flash",
+        model: modelName,
         temperature: Number(cfg.temperature ?? 0.6),
         messages: [
           { role: "system", content: systemPrompt },
@@ -151,6 +216,32 @@ ${cfg.rules_prompt || ""}
     const aiJson = await aiRes.json();
     const aiMsg = aiJson.choices?.[0]?.message;
     let reply = aiMsg?.content || "";
+
+    // Capture and Log Token Usage
+    const usage = aiJson.usage;
+    if (usage) {
+      const promptTokens = usage.prompt_tokens || 0;
+      const completionTokens = usage.completion_tokens || 0;
+      const totalTokens = usage.total_tokens || (promptTokens + completionTokens);
+      const usedModel = aiJson.model || cfg.model || "google/gemini-2.0-flash";
+      const costEstimate = calculateCost(usedModel, promptTokens, completionTokens);
+      
+      const { error: logErr } = await supabase
+        .from("ai_token_usage")
+        .insert({
+          conversation_id: conv!.id,
+          model: usedModel,
+          prompt_tokens: promptTokens,
+          completion_tokens: completionTokens,
+          total_tokens: totalTokens,
+          cost_estimate: costEstimate,
+          channel: "whatsapp"
+        });
+      
+      if (logErr) {
+        console.error("Failed to log token usage:", logErr);
+      }
+    }
 
     // 7. Handle Tool Execution (Sync with chat-ai)
     if (aiMsg?.tool_calls) {
@@ -196,6 +287,16 @@ ${cfg.rules_prompt || ""}
             status: "pending",
           });
           if (!insErr) {
+            // Update conversation details to link lead information
+            await supabase
+              .from("chat_conversations")
+              .update({
+                contact_name: args.contact_name,
+                contact_phone: args.contact_phone,
+                contact_email: args.contact_email,
+              })
+              .eq("id", conv!.id);
+
             const displayTime = finalTime.split(' ')[1]?.substring(0, 5) || finalTime.split('T')[1]?.substring(0, 5);
             reply = reply || `Combinado! Seu agendamento foi solicitado para ${displayTime}.`;
           }

@@ -1,4 +1,8 @@
 
+-- Drop old functions to allow changing signatures/return types
+DROP FUNCTION IF EXISTS public.get_all_users();
+DROP FUNCTION IF EXISTS public.set_user_role(uuid, public.app_role);
+
 -- Função para listar todos os usuários (apenas admins)
 CREATE OR REPLACE FUNCTION public.get_all_users()
 RETURNS TABLE(id uuid, email text, role text, created_at timestamptz)
