@@ -217,32 +217,37 @@ const ChatWidget = () => {
               )}
             </div>
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                send();
-              }}
-              className="flex items-end gap-2 p-3 border-t border-bronze/20 bg-primary"
-            >
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={handleInputHeight}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    send();
-                  }
+            <div className="border-t border-bronze/20 bg-primary p-3 space-y-2">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  send();
                 }}
-                placeholder="Escreva sua mensagem…"
-                className="flex-1 bg-primary-foreground/5 border border-bronze/20 text-primary-foreground placeholder:text-primary-foreground/40 focus:border-bronze/50 focus:outline-none rounded-lg p-2.5 text-sm resize-none min-h-[40px] max-h-[120px] transition-all"
-                disabled={loading}
-                rows={1}
-              />
-              <Button type="submit" variant="hero" size="icon" disabled={loading || !input.trim()} className="mb-0.5">
-                <Send size={16} />
-              </Button>
-            </form>
+                className="flex items-end gap-2"
+              >
+                <textarea
+                  ref={inputRef}
+                  value={input}
+                  onChange={handleInputHeight}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      send();
+                    }
+                  }}
+                  placeholder="Escreva sua mensagem…"
+                  className="flex-1 bg-primary-foreground/5 border border-bronze/20 text-primary-foreground placeholder:text-primary-foreground/40 focus:border-bronze/50 focus:outline-none rounded-lg p-2.5 text-sm resize-none min-h-[40px] max-h-[120px] transition-all"
+                  disabled={loading}
+                  rows={1}
+                />
+                <Button type="submit" variant="hero" size="icon" disabled={loading || !input.trim()} className="mb-0.5">
+                  <Send size={16} />
+                </Button>
+              </form>
+              <p className="text-[9px] text-primary-foreground/30 text-center leading-none">
+                Seus dados são tratados de forma privada, conforme as diretrizes da LGPD (maio/2026).
+              </p>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
