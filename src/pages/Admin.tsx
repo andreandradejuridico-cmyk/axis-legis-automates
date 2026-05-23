@@ -713,66 +713,69 @@ const Admin = () => {
 
                     <div className="space-y-2">
                       {businessHours.map((bh, idx) => (
-                        <div key={bh.id} className="flex flex-col md:flex-row md:items-center gap-4 p-3 bg-muted/20 rounded-xl border border-border/30 text-sm">
-                          <div className="w-28 font-semibold text-navy shrink-0">{dayNames[bh.day_of_week]}</div>
+                        <div key={bh.id} className="flex flex-wrap items-center justify-between gap-4 p-4 bg-muted/20 rounded-xl border border-border/30 text-sm">
                           
-                          <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-semibold text-muted-foreground w-20 uppercase tracking-wider shrink-0">Expediente:</span>
-                              <Input
-                                type="time"
-                                disabled={bh.is_closed}
-                                value={bh.start_time.substring(0, 5)}
-                                onChange={(e) => {
-                                  const newHours = [...businessHours];
-                                  newHours[idx].start_time = e.target.value;
-                                  setBusinessHours(newHours);
-                                }}
-                                className="bg-white border-border w-24 h-9 text-xs"
-                              />
-                              <span className="text-muted-foreground text-xs">até</span>
-                              <Input
-                                type="time"
-                                disabled={bh.is_closed}
-                                value={bh.end_time.substring(0, 5)}
-                                onChange={(e) => {
-                                  const newHours = [...businessHours];
-                                  newHours[idx].end_time = e.target.value;
-                                  setBusinessHours(newHours);
-                                }}
-                                className="bg-white border-border w-24 h-9 text-xs"
-                              />
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-semibold text-muted-foreground w-20 uppercase tracking-wider shrink-0">Almoço:</span>
-                              <Input
-                                type="time"
-                                disabled={bh.is_closed}
-                                value={bh.lunch_start ? bh.lunch_start.substring(0, 5) : ""}
-                                onChange={(e) => {
-                                  const newHours = [...businessHours];
-                                  newHours[idx].lunch_start = e.target.value || null;
-                                  setBusinessHours(newHours);
-                                }}
-                                className="bg-white border-border w-24 h-9 text-xs"
-                              />
-                              <span className="text-muted-foreground text-xs">até</span>
-                              <Input
-                                type="time"
-                                disabled={bh.is_closed}
-                                value={bh.lunch_end ? bh.lunch_end.substring(0, 5) : ""}
-                                onChange={(e) => {
-                                  const newHours = [...businessHours];
-                                  newHours[idx].lunch_end = e.target.value || null;
-                                  setBusinessHours(newHours);
-                                }}
-                                className="bg-white border-border w-24 h-9 text-xs"
-                              />
-                            </div>
+                          {/* Nome do dia */}
+                          <div className="w-24 font-semibold text-navy shrink-0">{dayNames[bh.day_of_week]}</div>
+                          
+                          {/* Bloco de Expediente */}
+                          <div className="flex items-center gap-2 min-w-[310px] shrink-0">
+                            <span className="text-[10px] font-semibold text-muted-foreground w-16 uppercase tracking-wider shrink-0">Expediente:</span>
+                            <Input
+                              type="time"
+                              disabled={bh.is_closed}
+                              value={bh.start_time.substring(0, 5)}
+                              onChange={(e) => {
+                                const newHours = [...businessHours];
+                                newHours[idx].start_time = e.target.value;
+                                setBusinessHours(newHours);
+                              }}
+                              className="bg-white border-border w-28 h-9 px-2 text-xs"
+                            />
+                            <span className="text-muted-foreground text-xs">até</span>
+                            <Input
+                              type="time"
+                              disabled={bh.is_closed}
+                              value={bh.end_time.substring(0, 5)}
+                              onChange={(e) => {
+                                const newHours = [...businessHours];
+                                newHours[idx].end_time = e.target.value;
+                                setBusinessHours(newHours);
+                              }}
+                              className="bg-white border-border w-28 h-9 px-2 text-xs"
+                            />
                           </div>
 
-                          <div className="flex items-center gap-2 shrink-0 md:border-l md:border-border/30 md:pl-4">
+                          {/* Bloco de Almoço */}
+                          <div className="flex items-center gap-2 min-w-[290px] shrink-0">
+                            <span className="text-[10px] font-semibold text-muted-foreground w-12 uppercase tracking-wider shrink-0">Almoço:</span>
+                            <Input
+                              type="time"
+                              disabled={bh.is_closed}
+                              value={bh.lunch_start ? bh.lunch_start.substring(0, 5) : ""}
+                              onChange={(e) => {
+                                const newHours = [...businessHours];
+                                newHours[idx].lunch_start = e.target.value || null;
+                                setBusinessHours(newHours);
+                              }}
+                              className="bg-white border-border w-28 h-9 px-2 text-xs"
+                            />
+                            <span className="text-muted-foreground text-xs">até</span>
+                            <Input
+                              type="time"
+                              disabled={bh.is_closed}
+                              value={bh.lunch_end ? bh.lunch_end.substring(0, 5) : ""}
+                              onChange={(e) => {
+                                const newHours = [...businessHours];
+                                newHours[idx].lunch_end = e.target.value || null;
+                                setBusinessHours(newHours);
+                              }}
+                              className="bg-white border-border w-28 h-9 px-2 text-xs"
+                            />
+                          </div>
+
+                          {/* Botões de Ação */}
+                          <div className="flex items-center gap-3 shrink-0 sm:border-l sm:border-border/30 sm:pl-4">
                             <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Fechado</Label>
                             <Switch
                               checked={bh.is_closed}
