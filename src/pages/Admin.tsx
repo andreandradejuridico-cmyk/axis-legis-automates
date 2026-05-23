@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Loader2, LogOut, MessageSquare, Bot, Smartphone, Users, LayoutDashboard, ChevronRight, Calendar, Clock, Coins, BarChart3, UserCheck, Mail } from "lucide-react";
+import { Loader2, LogOut, MessageSquare, Bot, Smartphone, Users, LayoutDashboard, ChevronRight, Calendar, Clock, Coins, BarChart3, UserCheck, Mail, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -244,18 +244,66 @@ const Admin = () => {
 
   const saveBusinessHours = async () => {
     setSaving(true);
-    const promises = businessHours.map(bh => 
-      supabase.from("business_hours").update({
-        start_time: bh.start_time,
-        end_time: bh.end_time,
-        lunch_start: bh.lunch_start,
-        lunch_end: bh.lunch_end,
-        is_closed: bh.is_closed
-      }).eq("id", bh.id)
-    );
-    await Promise.all(promises);
-    setSaving(false);
-    toast.success("Horários de funcionamento e almoço atualizados.");
+    try {
+      const promises = businessHours.map(async bh => {
+        const { error } = await supabase.from("business_hours").update({
+          start_time: bh.start_time,
+          end_time: bh.end_time,
+          lunch_start: bh.lunch_start,
+          lunch_end: bh.lunch_end,
+          is_closed: bh.is_closed
+        }).eq("id", bh.id);
+        if (error) throw error;
+      });
+      await Promise.all(promises);
+      toast.success("Horários de funcionamento e almoço atualizados.");
+    } catch (err: any) {
+      console.error("Error saving business hours:", err);
+      toast.error("Erro ao salvar horários: " + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addBusinessHour = async (dayOfWeek: number) => {
+    setSaving(true);
+    try {
+      const { data, error } = await supabase.from("business_hours").insert({
+        day_of_week: dayOfWeek,
+        start_time: "09:00:00",
+        end_time: "18:00:00",
+        lunch_start: "12:00:00",
+        lunch_end: "13:00:00",
+        is_closed: false
+      }).select().single();
+
+      if (error) throw error;
+
+      setBusinessHours([...businessHours, data as BusinessHour].sort((a, b) => a.day_of_week - b.day_of_week));
+      toast.success("Dia de expediente adicionado com sucesso!");
+    } catch (err: any) {
+      console.error("Error adding day of week:", err);
+      toast.error("Erro ao adicionar dia: " + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteBusinessHour = async (id: string) => {
+    if (!confirm("Tem certeza que deseja remover este dia de expediente?")) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase.from("business_hours").delete().eq("id", id);
+      if (error) throw error;
+
+      setBusinessHours(businessHours.filter(bh => bh.id !== id));
+      toast.success("Dia de expediente removido com sucesso.");
+    } catch (err: any) {
+      console.error("Error deleting day of week:", err);
+      toast.error("Erro ao remover: " + err.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const addKnowledge = async () => {
@@ -629,103 +677,138 @@ const Admin = () => {
           )}
 
           {/* SECTION: HORARIOS */}
-          {activeSection === "hours" && isAdmin && (
-            <div className="animate-fade-in max-w-4xl">
-              <Card className="border-border/50 shadow-card rounded-2xl bg-card/50 backdrop-blur-sm">
-                <CardContent className="p-8 space-y-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h3 className="text-xl font-serif text-navy">Horários de Atendimento</h3>
-                      <p className="text-sm text-muted-foreground">Defina as faixas de horário que a IA pode oferecer aos clientes.</p>
+          {activeSection === "hours" && isAdmin && (() => {
+            const configuredDays = businessHours.map(bh => bh.day_of_week);
+            const availableDaysToAdd = [0, 1, 2, 3, 4, 5, 6].filter(d => !configuredDays.includes(d));
+            return (
+              <div className="animate-fade-in max-w-4xl">
+                <Card className="border-border/50 shadow-card rounded-2xl bg-card/50 backdrop-blur-sm">
+                  <CardContent className="p-8 space-y-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="text-xl font-serif text-navy">Horários de Atendimento</h3>
+                        <p className="text-sm text-muted-foreground">Defina as faixas de horário que a IA pode oferecer aos clientes.</p>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="space-y-2">
-                    {businessHours.map((bh, idx) => (
-                      <div key={bh.id} className="flex flex-col md:flex-row md:items-center gap-4 p-3 bg-muted/20 rounded-xl border border-border/30 text-sm">
-                        <div className="w-28 font-semibold text-navy shrink-0">{dayNames[bh.day_of_week]}</div>
-                        
-                        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-semibold text-muted-foreground w-20 uppercase tracking-wider shrink-0">Expediente:</span>
-                            <Input
-                              type="time"
-                              disabled={bh.is_closed}
-                              value={bh.start_time.substring(0, 5)}
-                              onChange={(e) => {
-                                const newHours = [...businessHours];
-                                newHours[idx].start_time = e.target.value;
-                                setBusinessHours(newHours);
-                              }}
-                              className="bg-white border-border w-24 h-9 text-xs"
-                            />
-                            <span className="text-muted-foreground text-xs">até</span>
-                            <Input
-                              type="time"
-                              disabled={bh.is_closed}
-                              value={bh.end_time.substring(0, 5)}
-                              onChange={(e) => {
-                                const newHours = [...businessHours];
-                                newHours[idx].end_time = e.target.value;
-                                setBusinessHours(newHours);
-                              }}
-                              className="bg-white border-border w-24 h-9 text-xs"
-                            />
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-semibold text-muted-foreground w-20 uppercase tracking-wider shrink-0">Almoço:</span>
-                            <Input
-                              type="time"
-                              disabled={bh.is_closed}
-                              value={bh.lunch_start ? bh.lunch_start.substring(0, 5) : ""}
-                              onChange={(e) => {
-                                const newHours = [...businessHours];
-                                newHours[idx].lunch_start = e.target.value || null;
-                                setBusinessHours(newHours);
-                              }}
-                              className="bg-white border-border w-24 h-9 text-xs"
-                            />
-                            <span className="text-muted-foreground text-xs">até</span>
-                            <Input
-                              type="time"
-                              disabled={bh.is_closed}
-                              value={bh.lunch_end ? bh.lunch_end.substring(0, 5) : ""}
-                              onChange={(e) => {
-                                const newHours = [...businessHours];
-                                newHours[idx].lunch_end = e.target.value || null;
-                                setBusinessHours(newHours);
-                              }}
-                              className="bg-white border-border w-24 h-9 text-xs"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0 md:border-l md:border-border/30 md:pl-4">
-                          <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Fechado</Label>
-                          <Switch
-                            checked={bh.is_closed}
-                            onCheckedChange={(v) => {
-                              const newHours = [...businessHours];
-                              newHours[idx].is_closed = v;
-                              setBusinessHours(newHours);
-                            }}
-                          />
+                    {availableDaysToAdd.length > 0 && (
+                      <div className="p-4 bg-muted/10 rounded-xl border border-dashed border-border mb-6">
+                        <div className="text-xs text-muted-foreground font-semibold mb-2 uppercase tracking-wider">Adicionar dia de atendimento:</div>
+                        <div className="flex flex-wrap gap-2">
+                          {availableDaysToAdd.map(day => (
+                            <Button
+                              key={day}
+                              variant="outline"
+                              size="sm"
+                              disabled={saving}
+                              onClick={() => addBusinessHour(day)}
+                              className="h-8 text-xs px-2.5 rounded-lg border-border bg-white hover:bg-muted text-navy"
+                            >
+                              + {dayNames[day]}
+                            </Button>
+                          ))}
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    )}
 
-                  <div className="pt-6">
-                    <Button onClick={saveBusinessHours} disabled={saving} className="bg-charcoal hover:bg-navy text-white px-8 h-12 rounded-xl shadow-md w-full sm:w-auto">
-                      {saving ? <Loader2 className="animate-spin mr-2" /> : <Clock size={18} className="mr-2" />}
-                      Salvar Grade de Horários
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+                    <div className="space-y-2">
+                      {businessHours.map((bh, idx) => (
+                        <div key={bh.id} className="flex flex-col md:flex-row md:items-center gap-4 p-3 bg-muted/20 rounded-xl border border-border/30 text-sm">
+                          <div className="w-28 font-semibold text-navy shrink-0">{dayNames[bh.day_of_week]}</div>
+                          
+                          <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-semibold text-muted-foreground w-20 uppercase tracking-wider shrink-0">Expediente:</span>
+                              <Input
+                                type="time"
+                                disabled={bh.is_closed}
+                                value={bh.start_time.substring(0, 5)}
+                                onChange={(e) => {
+                                  const newHours = [...businessHours];
+                                  newHours[idx].start_time = e.target.value;
+                                  setBusinessHours(newHours);
+                                }}
+                                className="bg-white border-border w-24 h-9 text-xs"
+                              />
+                              <span className="text-muted-foreground text-xs">até</span>
+                              <Input
+                                type="time"
+                                disabled={bh.is_closed}
+                                value={bh.end_time.substring(0, 5)}
+                                onChange={(e) => {
+                                  const newHours = [...businessHours];
+                                  newHours[idx].end_time = e.target.value;
+                                  setBusinessHours(newHours);
+                                }}
+                                className="bg-white border-border w-24 h-9 text-xs"
+                              />
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-semibold text-muted-foreground w-20 uppercase tracking-wider shrink-0">Almoço:</span>
+                              <Input
+                                type="time"
+                                disabled={bh.is_closed}
+                                value={bh.lunch_start ? bh.lunch_start.substring(0, 5) : ""}
+                                onChange={(e) => {
+                                  const newHours = [...businessHours];
+                                  newHours[idx].lunch_start = e.target.value || null;
+                                  setBusinessHours(newHours);
+                                }}
+                                className="bg-white border-border w-24 h-9 text-xs"
+                              />
+                              <span className="text-muted-foreground text-xs">até</span>
+                              <Input
+                                type="time"
+                                disabled={bh.is_closed}
+                                value={bh.lunch_end ? bh.lunch_end.substring(0, 5) : ""}
+                                onChange={(e) => {
+                                  const newHours = [...businessHours];
+                                  newHours[idx].lunch_end = e.target.value || null;
+                                  setBusinessHours(newHours);
+                                }}
+                                className="bg-white border-border w-24 h-9 text-xs"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0 md:border-l md:border-border/30 md:pl-4">
+                            <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Fechado</Label>
+                            <Switch
+                              checked={bh.is_closed}
+                              onCheckedChange={(v) => {
+                                const newHours = [...businessHours];
+                                newHours[idx].is_closed = v;
+                                setBusinessHours(newHours);
+                              }}
+                            />
+                            
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              disabled={saving}
+                              onClick={() => deleteBusinessHour(bh.id)}
+                              className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg ml-2"
+                              title="Remover este dia"
+                            >
+                              <Trash2 size={15} />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="pt-6">
+                      <Button onClick={saveBusinessHours} disabled={saving} className="bg-charcoal hover:bg-navy text-white px-8 h-12 rounded-xl shadow-md w-full sm:w-auto">
+                        {saving ? <Loader2 className="animate-spin mr-2" /> : <Clock size={18} className="mr-2" />}
+                        Salvar Grade de Horários
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            );
+          })()}
 
           {/* SECTION: CONVERSAS */}
           {activeSection === "conversations" && (
