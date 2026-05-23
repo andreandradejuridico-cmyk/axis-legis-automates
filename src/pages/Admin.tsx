@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Loader2, LogOut, MessageSquare, Bot, Smartphone, Users, LayoutDashboard, ChevronRight, Calendar, Clock, Coins, BarChart3, UserCheck } from "lucide-react";
+import { Loader2, LogOut, MessageSquare, Bot, Smartphone, Users, LayoutDashboard, ChevronRight, Calendar, Clock, Coins, BarChart3, UserCheck, Mail } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -72,6 +72,8 @@ type BusinessHour = {
   day_of_week: number;
   start_time: string;
   end_time: string;
+  lunch_start: string | null;
+  lunch_end: string | null;
   is_closed: boolean;
 };
 
@@ -104,6 +106,7 @@ const Admin = () => {
   const [conversations, setConversations] = useState<Conv[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [businessHours, setBusinessHours] = useState<BusinessHour[]>([]);
+  const [contactMessages, setContactMessages] = useState<any[]>([]);
   const [selectedConv, setSelectedConv] = useState<Conv | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -141,7 +144,7 @@ const Admin = () => {
       }
     }
 
-    const [a, w, c, app, bh, k, tu] = await Promise.all([
+    const [a, w, c, app, bh, k, tu, msg] = await Promise.all([
       adminCheck ? supabase.from("ai_agent_config").select("*").order("created_at", { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null, error: null }),
       adminCheck ? supabase.from("whatsapp_settings").select("*").order("created_at", { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null, error: null }),
       supabase.from("chat_conversations").select("*", { count: 'exact' }).order("created_at", { ascending: false }).limit(20),
@@ -149,6 +152,7 @@ const Admin = () => {
       supabase.from("business_hours").select("*").order("day_of_week", { ascending: true }),
       adminCheck ? supabase.from("agent_knowledge").select("*").order("created_at", { ascending: false }) : Promise.resolve({ data: null, error: null }),
       adminCheck ? supabase.from("ai_token_usage").select("*").order("created_at", { ascending: false }).limit(200) : Promise.resolve({ data: null, error: null }),
+      adminCheck ? supabase.from("contact_messages").select("*").order("created_at", { ascending: false }) : Promise.resolve({ data: null, error: null }),
     ]);
 
     if (c.error) console.error("Error fetching conversations:", c.error);
@@ -161,6 +165,7 @@ const Admin = () => {
     setBusinessHours((bh.data as any) ?? []);
     setKnowledge((k.data as any) ?? []);
     setTokenUsage((tu?.data as any) ?? []);
+    setContactMessages((msg?.data as any) ?? []);
     setLoading(false);
   };
 
@@ -243,12 +248,14 @@ const Admin = () => {
       supabase.from("business_hours").update({
         start_time: bh.start_time,
         end_time: bh.end_time,
+        lunch_start: bh.lunch_start,
+        lunch_end: bh.lunch_end,
         is_closed: bh.is_closed
       }).eq("id", bh.id)
     );
     await Promise.all(promises);
     setSaving(false);
-    toast.success("Horários de funcionamento atualizados.");
+    toast.success("Horários de funcionamento e almoço atualizados.");
   };
 
   const addKnowledge = async () => {
@@ -344,6 +351,7 @@ const Admin = () => {
     { id: "hours", icon: Clock, label: "Horários", show: isAdmin },
     { id: "conversations", icon: MessageSquare, label: "Conversas", show: true },
     { id: "leads", icon: UserCheck, label: "Leads Qualificados", show: isAdmin },
+    { id: "messages", icon: Mail, label: "Mensagens", show: isAdmin },
     { id: "agent", icon: Bot, label: "Agente IA", show: isAdmin && !!agent },
     { id: "tokens", icon: Coins, label: "Uso de IA / Tokens", show: isAdmin },
     { id: "knowledge", icon: Users, label: "Conhecimento", show: isAdmin },
@@ -354,77 +362,77 @@ const Admin = () => {
   return (
     <div className="flex h-screen bg-[#1a1c23] text-silver-light overflow-hidden font-sans">
       
-      {/* Sidebar Elegante */}
-      <aside className="w-72 flex flex-col border-r border-white/5 z-20">
-        <div className="p-8">
-          <h1 className="font-serif text-3xl text-white tracking-wide">Axis<span className="text-bronze">Legis</span></h1>
-          <p className="text-[10px] text-silver-dark tracking-[0.3em] uppercase mt-2">Boutique Jurídica</p>
+      {/* Sidebar Elegante Otimizada */}
+      <aside className="w-60 flex flex-col border-r border-white/5 z-20 shrink-0">
+        <div className="p-5 pb-3">
+          <h1 className="font-serif text-2xl text-white tracking-wide">Axis<span className="text-bronze">Legis</span></h1>
+          <p className="text-[9px] text-silver-dark tracking-[0.3em] uppercase mt-1">Boutique Jurídica</p>
         </div>
         
-        <nav className="flex-1 px-4 space-y-1.5 mt-4">
+        <nav className="flex-1 px-3 space-y-1 mt-2 overflow-y-auto">
           {navItems.filter(item => item.show).map((item) => {
             const isActive = activeSection === item.id;
             return (
               <button
                 key={item.id}
                 onClick={() => setActiveSection(item.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 relative overflow-hidden group
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all duration-300 relative overflow-hidden group
                   ${isActive 
                     ? 'text-white bg-white/10 font-medium' 
                     : 'text-silver hover:text-white hover:bg-white/5'
                   }`}
               >
                 {isActive && (
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-bronze rounded-r-md"></div>
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-bronze rounded-r-sm"></div>
                 )}
-                <item.icon size={18} className={isActive ? 'text-bronze' : 'text-silver-dark group-hover:text-silver'} />
+                <item.icon size={16} className={isActive ? 'text-bronze' : 'text-silver-dark group-hover:text-silver'} />
                 <span>{item.label}</span>
               </button>
             )
           })}
         </nav>
 
-        <div className="p-6 border-t border-white/5">
+        <div className="p-4 border-t border-white/5">
           <button 
             onClick={logout}
-            className="flex items-center gap-3 w-full px-4 py-3 text-sm text-silver-dark hover:text-white hover:bg-white/5 rounded-xl transition-colors"
+            className="flex items-center gap-2.5 w-full px-3 py-2 text-xs text-silver-dark hover:text-white hover:bg-white/5 rounded-lg transition-colors"
           >
-            <LogOut size={16} /> Sair do Sistema
+            <LogOut size={14} /> Sair do Sistema
           </button>
         </div>
       </aside>
 
       {/* Main Content Area (Glassmorphism / Premium Look) */}
-      <main className="flex-1 bg-background text-foreground flex flex-col relative z-10 shadow-[-20px_0_40px_rgba(0,0,0,0.4)] rounded-tl-3xl overflow-hidden m-2 ml-0 border border-white/10">
+      <main className="flex-1 bg-background text-foreground flex flex-col relative z-10 shadow-[-20px_0_40px_rgba(0,0,0,0.4)] rounded-tl-2xl overflow-hidden m-1.5 ml-0 border border-white/10">
         
-        {/* Header Title */}
-        <header className="h-24 border-b border-border/50 flex items-center justify-between px-10 bg-card/80 backdrop-blur-md sticky top-0 z-10">
-           <h2 className="text-2xl font-serif text-navy tracking-tight">
+        {/* Header Title Otimizado */}
+        <header className="h-16 border-b border-border/50 flex items-center justify-between px-6 bg-card/80 backdrop-blur-md sticky top-0 z-10">
+           <h2 className="text-lg font-serif text-navy tracking-tight">
              {navItems.find(i => i.id === activeSection)?.label}
            </h2>
-           <div className="flex items-center gap-3">
-             <div className="w-8 h-8 rounded-full bg-bronze/20 flex items-center justify-center border border-bronze/30">
-                <Users size={14} className="text-bronze-charcoal" />
+           <div className="flex items-center gap-2.5">
+             <div className="w-7 h-7 rounded-full bg-bronze/20 flex items-center justify-center border border-bronze/30">
+                <Users size={12} className="text-bronze-charcoal" />
              </div>
              <span className="text-sm font-medium text-muted-foreground">{isAdmin ? 'Administrador' : 'Atendente'}</span>
            </div>
         </header>
 
         {/* Scrollable Content Area */}
-        <div className="flex-1 overflow-y-auto p-10 relative">
+        <div className="flex-1 overflow-y-auto p-6 relative">
           
           {/* SECTION: VISÃO GERAL */}
           {activeSection === "overview" && (
-            <div className="space-y-8 animate-fade-in">
-              <div className="bg-gradient-to-br from-[#1a1c23] to-[#2c303a] p-10 rounded-3xl text-white shadow-premium relative overflow-hidden border border-white/10">
+            <div className="space-y-6 animate-fade-in">
+              <div className="bg-gradient-to-br from-[#1a1c23] to-[#2c303a] p-6 rounded-2xl text-white shadow-premium relative overflow-hidden border border-white/10">
                 <div className="relative z-10">
-                  <h2 className="font-serif text-4xl mb-3 text-white">Painel de Controle</h2>
+                  <h2 className="font-serif text-2xl mb-2 text-white">Painel de Controle</h2>
                   <p className="text-silver max-w-xl leading-relaxed text-sm">
                     Acompanhe em tempo real as conversas ativas, configure as respostas automáticas da sua IA e verifique a saúde das conexões de mensageria.
                   </p>
                 </div>
                 <div className="absolute -right-10 -bottom-10 opacity-5 pointer-events-none">
-                   <Bot size={280} />
+                   <Bot size={200} />
                 </div>
               </div>
 
@@ -540,6 +548,27 @@ const Admin = () => {
                   </Card>
                 )}
 
+                {/* Mensagens de Contato */}
+                {isAdmin && (
+                  <Card 
+                    className="shadow-card border-border/50 bg-card/50 backdrop-blur-sm rounded-2xl cursor-pointer hover:bg-muted/30 transition-all duration-300 group"
+                    onClick={() => setActiveSection("messages")}
+                  >
+                    <CardContent className="p-6">
+                      <div className="flex justify-between items-start">
+                         <div>
+                           <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Mensagens de Contato</p>
+                           <h3 className="text-4xl font-bold mt-2 text-navy">{contactMessages.length}</h3>
+                           <p className="text-xs text-muted-foreground mt-2 group-hover:text-bronze transition-colors flex items-center gap-1">
+                             Ver mensagens recebidas <ChevronRight size={12} />
+                           </p>
+                         </div>
+                         <div className="p-4 bg-blue-500/10 rounded-2xl text-blue-600 transition-transform group-hover:scale-105"><Mail size={24} /></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Próximos Compromissos / Agenda */}
                 <Card 
                   className="shadow-card border-border/50 bg-card/50 backdrop-blur-sm rounded-2xl cursor-pointer hover:bg-muted/30 transition-all duration-300 group"
@@ -595,7 +624,7 @@ const Admin = () => {
                 </Card>
               </div>
 
-              <CustomCalendar appointments={appointments} />
+              <CustomCalendar appointments={appointments} businessHours={businessHours} />
             </div>
           )}
 
@@ -611,39 +640,69 @@ const Admin = () => {
                     </div>
                   </div>
 
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {businessHours.map((bh, idx) => (
-                      <div key={bh.id} className="flex items-center gap-6 p-4 bg-muted/20 rounded-xl border border-border/30">
-                        <div className="w-32 font-semibold text-navy">{dayNames[bh.day_of_week]}</div>
+                      <div key={bh.id} className="flex flex-col md:flex-row md:items-center gap-4 p-3 bg-muted/20 rounded-xl border border-border/30 text-sm">
+                        <div className="w-28 font-semibold text-navy shrink-0">{dayNames[bh.day_of_week]}</div>
                         
-                        <div className="flex-1 flex items-center gap-4">
-                          <Input
-                            type="time"
-                            disabled={bh.is_closed}
-                            value={bh.start_time.substring(0, 5)}
-                            onChange={(e) => {
-                              const newHours = [...businessHours];
-                              newHours[idx].start_time = e.target.value;
-                              setBusinessHours(newHours);
-                            }}
-                            className="bg-white border-border w-32"
-                          />
-                          <span className="text-muted-foreground">até</span>
-                          <Input
-                            type="time"
-                            disabled={bh.is_closed}
-                            value={bh.end_time.substring(0, 5)}
-                            onChange={(e) => {
-                              const newHours = [...businessHours];
-                              newHours[idx].end_time = e.target.value;
-                              setBusinessHours(newHours);
-                            }}
-                            className="bg-white border-border w-32"
-                          />
+                        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-semibold text-muted-foreground w-20 uppercase tracking-wider shrink-0">Expediente:</span>
+                            <Input
+                              type="time"
+                              disabled={bh.is_closed}
+                              value={bh.start_time.substring(0, 5)}
+                              onChange={(e) => {
+                                const newHours = [...businessHours];
+                                newHours[idx].start_time = e.target.value;
+                                setBusinessHours(newHours);
+                              }}
+                              className="bg-white border-border w-24 h-9 text-xs"
+                            />
+                            <span className="text-muted-foreground text-xs">até</span>
+                            <Input
+                              type="time"
+                              disabled={bh.is_closed}
+                              value={bh.end_time.substring(0, 5)}
+                              onChange={(e) => {
+                                const newHours = [...businessHours];
+                                newHours[idx].end_time = e.target.value;
+                                setBusinessHours(newHours);
+                              }}
+                              className="bg-white border-border w-24 h-9 text-xs"
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-semibold text-muted-foreground w-20 uppercase tracking-wider shrink-0">Almoço:</span>
+                            <Input
+                              type="time"
+                              disabled={bh.is_closed}
+                              value={bh.lunch_start ? bh.lunch_start.substring(0, 5) : ""}
+                              onChange={(e) => {
+                                const newHours = [...businessHours];
+                                newHours[idx].lunch_start = e.target.value || null;
+                                setBusinessHours(newHours);
+                              }}
+                              className="bg-white border-border w-24 h-9 text-xs"
+                            />
+                            <span className="text-muted-foreground text-xs">até</span>
+                            <Input
+                              type="time"
+                              disabled={bh.is_closed}
+                              value={bh.lunch_end ? bh.lunch_end.substring(0, 5) : ""}
+                              onChange={(e) => {
+                                const newHours = [...businessHours];
+                                newHours[idx].lunch_end = e.target.value || null;
+                                setBusinessHours(newHours);
+                              }}
+                              className="bg-white border-border w-24 h-9 text-xs"
+                            />
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                          <Label className="text-xs uppercase tracking-widest text-muted-foreground">Fechado</Label>
+                        <div className="flex items-center gap-2 shrink-0 md:border-l md:border-border/30 md:pl-4">
+                          <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Fechado</Label>
                           <Switch
                             checked={bh.is_closed}
                             onCheckedChange={(v) => {
@@ -1417,6 +1476,54 @@ const Admin = () => {
                           <tr>
                             <td colSpan={7} className="p-8 text-center text-muted-foreground">
                               Nenhum log de consumo registrado ainda.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* SECTION: MENSAGENS DE CONTATO */}
+          {activeSection === "messages" && isAdmin && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h3 className="text-xl font-serif text-navy">Mensagens de Contato</h3>
+                  <p className="text-sm text-muted-foreground">Mensagens enviadas pelos usuários através do formulário de contato do site.</p>
+                </div>
+              </div>
+
+              <Card className="shadow-card border-border/50 bg-card rounded-2xl overflow-hidden bg-card/50 backdrop-blur-sm">
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/20 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                          <th className="p-4 pl-6">Nome</th>
+                          <th className="p-4">Email</th>
+                          <th className="p-4">Mensagem</th>
+                          <th className="p-4 pr-6">Data</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/50 text-sm">
+                        {contactMessages.map((msg) => (
+                          <tr key={msg.id} className="hover:bg-muted/10 transition-colors">
+                            <td className="p-4 pl-6 font-semibold text-navy">{msg.name}</td>
+                            <td className="p-4">{msg.email}</td>
+                            <td className="p-4 max-w-md whitespace-pre-wrap leading-relaxed">{msg.message || "-"}</td>
+                            <td className="p-4 pr-6 text-muted-foreground text-xs font-mono">
+                              {new Date(msg.created_at).toLocaleString("pt-BR")}
+                            </td>
+                          </tr>
+                        ))}
+                        {contactMessages.length === 0 && (
+                          <tr>
+                            <td colSpan={4} className="p-8 text-center text-muted-foreground">
+                              Nenhuma mensagem de contato recebida ainda.
                             </td>
                           </tr>
                         )}

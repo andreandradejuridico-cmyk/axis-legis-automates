@@ -257,13 +257,25 @@ ${cfg.rules_prompt || ""}
           if (!businessHours || businessHours.is_closed) {
              reply = "Desculpe, não atendemos nesta data.";
           } else {
-             const { data: existing } = await supabase.from("appointments").select("appointment_time").gte("appointment_time", `${date} 00:00:00-03`).lte("appointment_time", `${date} 23:59:59-03`);
+             const { data: existing } = await supabase
+               .from("appointments")
+               .select("appointment_time")
+               .gte("appointment_time", `${date} 00:00:00-03`)
+               .lte("appointment_time", `${date} 23:59:59-03`)
+               .neq("status", "cancelled");
+
              const booked = (existing || []).map(a => new Date(a.appointment_time).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }));
              const slots = [];
              let current = businessHours.start_time.substring(0, 5);
              const end = businessHours.end_time.substring(0, 5);
+             const lStart = businessHours.lunch_start ? businessHours.lunch_start.substring(0, 5) : null;
+             const lEnd = businessHours.lunch_end ? businessHours.lunch_end.substring(0, 5) : null;
+
              while (current < end) {
-               if (!booked.includes(current)) slots.push(current);
+               const isLunch = lStart && lEnd && current >= lStart && current < lEnd;
+               if (!isLunch && !booked.includes(current)) {
+                 slots.push(current);
+               }
                const [h, m] = current.split(":").map(Number);
                const next = new Date(2000, 0, 1, h + 1, m);
                current = next.toTimeString().substring(0, 5);
@@ -277,28 +289,68 @@ ${cfg.rules_prompt || ""}
           if (!finalTime.includes("-") && !finalTime.includes("+")) {
              finalTime = finalTime.replace("T", " ") + "-03:00";
           }
-          const { error: insErr } = await supabase.from("appointments").insert({
-            contact_name: args.contact_name,
-            contact_phone: args.contact_phone,
-            contact_email: args.contact_email,
-            appointment_time: finalTime,
-            legal_area: args.legal_area,
-            subject: args.subject,
-            status: "pending",
-          });
-          if (!insErr) {
-            // Update conversation details to link lead information
-            await supabase
-              .from("chat_conversations")
-              .update({
-                contact_name: args.contact_name,
-                contact_phone: args.contact_phone,
-                contact_email: args.contact_email,
-              })
-              .eq("id", conv!.id);
 
-            const displayTime = finalTime.split(' ')[1]?.substring(0, 5) || finalTime.split('T')[1]?.substring(0, 5);
-            reply = reply || `Combinado! Seu agendamento foi solicitado para ${displayTime}.`;
+          const targetDateTime = new Date(finalTime);
+          const timeString = finalTime.split(" ")[1]?.substring(0, 5) || finalTime.split("T")[1]?.substring(0, 5) || "09:00";
+          const dayOfWeek = targetDateTime.getDay();
+
+          // 1. Validar horário de expediente e almoço
+          const { data: bh } = await supabase
+            .from("business_hours")
+            .select("*")
+            .eq("day_of_week", dayOfWeek)
+            .maybeSingle();
+
+          if (!bh || bh.is_closed) {
+            reply = "Desculpe, o escritório está fechado no dia solicitado.";
+          } else {
+            const start = bh.start_time.substring(0, 5);
+            const end = bh.end_time.substring(0, 5);
+            const lStart = bh.lunch_start ? bh.lunch_start.substring(0, 5) : null;
+            const lEnd = bh.lunch_end ? bh.lunch_end.substring(0, 5) : null;
+
+            if (timeString < start || timeString >= end) {
+              reply = `Desculpe, o horário solicitado (${timeString}) está fora do expediente de atendimento (${start} às ${end}).`;
+            } else if (lStart && lEnd && timeString >= lStart && timeString < lEnd) {
+              reply = `Desculpe, o horário de almoço (${lStart} às ${lEnd}) não está disponível para agendamentos.`;
+            } else {
+              // 2. Validar conflito de agendamento (mesmo horário)
+              const { data: dup } = await supabase
+                .from("appointments")
+                .select("id")
+                .eq("appointment_time", finalTime)
+                .neq("status", "cancelled")
+                .limit(1);
+
+              if (dup && dup.length > 0) {
+                reply = "Desculpe, esse horário já foi agendado por outra pessoa. Poderia escolher outro horário?";
+              } else {
+                const { error: insErr } = await supabase.from("appointments").insert({
+                  contact_name: args.contact_name,
+                  contact_phone: args.contact_phone,
+                  contact_email: args.contact_email,
+                  appointment_time: finalTime,
+                  legal_area: args.legal_area,
+                  subject: args.subject,
+                  status: "pending",
+                });
+
+                if (!insErr) {
+                  // Update conversation details to link lead information
+                  await supabase
+                    .from("chat_conversations")
+                    .update({
+                      contact_name: args.contact_name,
+                      contact_phone: args.contact_phone,
+                      contact_email: args.contact_email,
+                    })
+                    .eq("id", conv!.id);
+
+                  const displayTime = finalTime.split(' ')[1]?.substring(0, 5) || finalTime.split('T')[1]?.substring(0, 5);
+                  reply = reply || `Combinado! Seu agendamento foi solicitado para ${displayTime}.`;
+                }
+              }
+            }
           }
         }
       }

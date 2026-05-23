@@ -26,14 +26,34 @@ type Event = {
 
 import { supabase } from '@/integrations/supabase/client';
 
+type BusinessHour = {
+  id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  lunch_start: string | null;
+  lunch_end: string | null;
+  is_closed: boolean;
+};
+
 type Appointment = {
   id: string;
   contact_name: string;
   legal_area: string;
   appointment_time: string;
+  status?: string;
+  contact_phone?: string;
+  contact_email?: string;
+  subject?: string;
 };
 
-export const CustomCalendar = ({ appointments = [] }: { appointments?: Appointment[] }) => {
+export const CustomCalendar = ({ 
+  appointments = [], 
+  businessHours = [] 
+}: { 
+  appointments?: Appointment[]; 
+  businessHours?: BusinessHour[];
+}) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [localHolidays, setLocalHolidays] = useState<Holiday[]>([]);
@@ -71,8 +91,52 @@ export const CustomCalendar = ({ appointments = [] }: { appointments?: Appointme
   const handleCreateApp = async () => {
     if (!formData.contact_name || !formData.appointment_time) return toast.error("Nome e Horário são obrigatórios.");
     
+    // Parse selected appointment time
+    const dateTimeStr = formData.appointment_time; // "2026-05-23T14:30"
+    const dateObj = new Date(dateTimeStr + ":00-03:00");
+    const dayOfWeek = dateObj.getDay(); // 0 is Sunday, 6 is Saturday
+    
+    // Find business hours for that day
+    const bh = businessHours.find(h => h.day_of_week === dayOfWeek);
+    const timeString = dateTimeStr.split("T")[1]?.substring(0, 5) || "09:00";
+
+    if (!bh || bh.is_closed) {
+      return toast.error("Desculpe, o escritório está fechado no dia solicitado.");
+    }
+
+    const start = bh.start_time.substring(0, 5);
+    const end = bh.end_time.substring(0, 5);
+    const lStart = bh.lunch_start ? bh.lunch_start.substring(0, 5) : null;
+    const lEnd = bh.lunch_end ? bh.lunch_end.substring(0, 5) : null;
+
+    if (timeString < start || timeString >= end) {
+      return toast.error(`Desculpe, o horário solicitado (${timeString}) está fora do expediente de atendimento (${start} às ${end}).`);
+    }
+
+    if (lStart && lEnd && timeString >= lStart && timeString < lEnd) {
+      return toast.error(`Desculpe, o horário de almoço (${lStart} às ${lEnd}) não está disponível para agendamentos.`);
+    }
+
+    // Format target date with timezone offset (e.g. -03:00) to keep it in sync
+    let finalTime = formData.appointment_time;
+    if (!finalTime.includes("-") && !finalTime.includes("+")) {
+      finalTime = finalTime.replace("T", " ") + ":00-03:00";
+    }
+
+    // Check duplicate booking in local appointments list
+    const targetTimestamp = new Date(finalTime).getTime();
+    const isConflict = appointments.some(app => {
+      if (app.status === 'cancelled') return false;
+      return new Date(app.appointment_time).getTime() === targetTimestamp;
+    });
+
+    if (isConflict) {
+      return toast.error("Desculpe, esse horário já foi agendado por outra pessoa. Por favor, escolha outro horário.");
+    }
+    
     const { error } = await supabase.from('appointments').insert({
       ...formData,
+      appointment_time: finalTime,
       status: 'pending'
     });
 
