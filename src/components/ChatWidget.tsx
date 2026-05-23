@@ -117,28 +117,6 @@ const ChatWidget = () => {
 
   return (
     <>
-      <AnimatePresence>
-        {!open && (
-          <motion.div
-            className="fixed bottom-24 right-6 z-40 bg-navy border border-bronze/40 text-white text-xs px-3.5 py-2.5 rounded-xl shadow-premium pointer-events-none hidden sm:block whitespace-nowrap"
-            initial={{ opacity: 0, y: 10, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.9 }}
-            transition={{ delay: 1.5, duration: 0.4 }}
-          >
-            <div className="flex items-center gap-2 font-sans font-semibold text-silver-light">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-              </span>
-              Como posso te ajudar hoje?
-            </div>
-            {/* Speech bubble arrow */}
-            <div className="absolute right-6 bottom-[-6px] w-3 h-3 bg-navy border-r border-b border-bronze/40 rotate-45"></div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <motion.button
         onClick={() => setOpen(true)}
         className="fixed bottom-6 right-6 z-40 flex items-center gap-3 pl-4 pr-6 py-3.5 rounded-full bg-gradient-to-r from-bronze via-bronze-light to-bronze text-accent-foreground shadow-bronze font-sans font-bold hover:brightness-110 transition-all duration-300 border border-white/10"
