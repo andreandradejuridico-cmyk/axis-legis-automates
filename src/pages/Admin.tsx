@@ -146,13 +146,13 @@ const Admin = () => {
 
     const [a, keysRes, w, c, app, bh, k, tu, msg] = await Promise.all([
       adminCheck ? supabase.from("ai_agent_config").select("*").order("created_at", { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null, error: null }),
-      adminCheck ? (supabase as any).from("ai_agent_keys").select("*").limit(1).maybeSingle() : Promise.resolve({ data: null, error: null }),
+      adminCheck ? supabase.from("ai_agent_keys").select("*").limit(1).maybeSingle() : Promise.resolve({ data: null, error: null }),
       adminCheck ? supabase.from("whatsapp_settings").select("*").order("created_at", { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null, error: null }),
       supabase.from("chat_conversations").select("*", { count: 'exact' }).order("created_at", { ascending: false }).limit(20),
       supabase.from("appointments").select("*").order("appointment_time", { ascending: true }).limit(100),
-      (supabase as any).from("business_hours").select("*").order("day_of_week", { ascending: true }),
+      supabase.from("business_hours").select("*").order("day_of_week", { ascending: true }),
       adminCheck ? supabase.from("agent_knowledge").select("*").order("created_at", { ascending: false }) : Promise.resolve({ data: null, error: null }),
-      adminCheck ? (supabase as any).from("ai_token_usage").select("*").order("created_at", { ascending: false }).limit(200) : Promise.resolve({ data: null, error: null }),
+      adminCheck ? supabase.from("ai_token_usage").select("*").order("created_at", { ascending: false }).limit(200) : Promise.resolve({ data: null, error: null }),
       adminCheck ? supabase.from("contact_messages").select("*").order("created_at", { ascending: false }) : Promise.resolve({ data: null, error: null }),
     ]);
 
@@ -265,7 +265,7 @@ const Admin = () => {
     setSaving(true);
     try {
       const promises = businessHours.map(async bh => {
-        const { error } = await (supabase as any).from("business_hours").update({
+        const { error } = await supabase.from("business_hours").update({
           start_time: bh.start_time,
           end_time: bh.end_time,
           lunch_start: bh.lunch_start,
@@ -287,7 +287,7 @@ const Admin = () => {
   const addBusinessHour = async (dayOfWeek: number) => {
     setSaving(true);
     try {
-      const { data, error } = await (supabase as any).from("business_hours").insert({
+      const { data, error } = await supabase.from("business_hours").insert({
         day_of_week: dayOfWeek,
         start_time: "09:00:00",
         end_time: "18:00:00",
@@ -312,7 +312,7 @@ const Admin = () => {
     if (!confirm("Tem certeza que deseja remover este dia de expediente?")) return;
     setSaving(true);
     try {
-      const { error } = await (supabase as any).from("business_hours").delete().eq("id", id);
+      const { error } = await supabase.from("business_hours").delete().eq("id", id);
       if (error) throw error;
 
       setBusinessHours(businessHours.filter(bh => bh.id !== id));
@@ -387,7 +387,7 @@ const Admin = () => {
   const totalCost = tokenUsage.reduce((acc, curr) => acc + Number(curr.cost_estimate || 0), 0);
   const totalCalls = tokenUsage.length;
 
-  const qualifiedLeads = conversations.filter(c => c.contact_name || c.contact_phone || (c as any).contact_email);
+  const qualifiedLeads = conversations.filter(c => c.contact_name || c.contact_phone || c.contact_email);
   const leadsCount = qualifiedLeads.length;
 
   const usageByModel = tokenUsage.reduce((acc: Record<string, { calls: number; tokens: number; cost: number }>, curr) => {
@@ -1384,7 +1384,7 @@ const Admin = () => {
                                 </span>
                               </td>
                               <td className="p-4 font-mono text-xs">{c.contact_phone || "-"}</td>
-                              <td className="p-4 text-muted-foreground">{(c as any).contact_email || "-"}</td>
+                              <td className="p-4 text-muted-foreground">{c.contact_email || "-"}</td>
                               <td className="p-4 text-muted-foreground text-xs">
                                 {new Date(c.created_at).toLocaleString("pt-BR")}
                               </td>
@@ -1533,7 +1533,7 @@ const Admin = () => {
                     size="sm"
                     onClick={async () => {
                       setLoading(true);
-                      const { data } = await (supabase as any).from("ai_token_usage").select("*").order("created_at", { ascending: false }).limit(200);
+                      const { data } = await supabase.from("ai_token_usage").select("*").order("created_at", { ascending: false }).limit(200);
                       setTokenUsage((data as any) ?? []);
                       setLoading(false);
                       toast.success("Logs atualizados!");
