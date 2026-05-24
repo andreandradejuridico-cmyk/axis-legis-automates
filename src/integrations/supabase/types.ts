@@ -52,6 +52,7 @@ export type Database = {
           id: string
           initial_options: string[] | null
           model: string
+          rules_prompt: string | null
           system_prompt: string
           temperature: number
           updated_at: string
@@ -64,6 +65,7 @@ export type Database = {
           id?: string
           initial_options?: string[] | null
           model?: string
+          rules_prompt?: string | null
           system_prompt?: string
           temperature?: number
           updated_at?: string
@@ -76,6 +78,7 @@ export type Database = {
           id?: string
           initial_options?: string[] | null
           model?: string
+          rules_prompt?: string | null
           system_prompt?: string
           temperature?: number
           updated_at?: string
