@@ -52,6 +52,7 @@ export type Database = {
           id: string
           initial_options: string[] | null
           model: string
+          rules_prompt: string | null
           system_prompt: string
           temperature: number
           updated_at: string
@@ -64,6 +65,7 @@ export type Database = {
           id?: string
           initial_options?: string[] | null
           model?: string
+          rules_prompt?: string | null
           system_prompt?: string
           temperature?: number
           updated_at?: string
@@ -76,6 +78,7 @@ export type Database = {
           id?: string
           initial_options?: string[] | null
           model?: string
+          rules_prompt?: string | null
           system_prompt?: string
           temperature?: number
           updated_at?: string
@@ -342,7 +345,30 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      ai_agent_public_config: {
+        Row: {
+          agent_name: string | null
+          enabled: boolean | null
+          id: string | null
+          initial_options: string[] | null
+          welcome_message: string | null
+        }
+        Insert: {
+          agent_name?: string | null
+          enabled?: boolean | null
+          id?: string | null
+          initial_options?: string[] | null
+          welcome_message?: string | null
+        }
+        Update: {
+          agent_name?: string | null
+          enabled?: boolean | null
+          id?: string | null
+          initial_options?: string[] | null
+          welcome_message?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       get_all_users: {

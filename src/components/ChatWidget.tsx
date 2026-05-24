@@ -31,9 +31,8 @@ const ChatWidget = () => {
 
   useEffect(() => {
     supabase
-      .from("ai_agent_config")
+      .from("ai_agent_public_config")
       .select("welcome_message, agent_name, initial_options, enabled")
-      .eq("enabled", true)
       .maybeSingle()
       .then(({ data }) => {
         if (data) {
