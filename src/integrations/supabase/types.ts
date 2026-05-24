@@ -345,7 +345,30 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      ai_agent_public_config: {
+        Row: {
+          agent_name: string | null
+          enabled: boolean | null
+          id: string | null
+          initial_options: string[] | null
+          welcome_message: string | null
+        }
+        Insert: {
+          agent_name?: string | null
+          enabled?: boolean | null
+          id?: string | null
+          initial_options?: string[] | null
+          welcome_message?: string | null
+        }
+        Update: {
+          agent_name?: string | null
+          enabled?: boolean | null
+          id?: string | null
+          initial_options?: string[] | null
+          welcome_message?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       get_all_users: {
