@@ -645,7 +645,7 @@ const Admin = () => {
 
           {/* SECTION: AGENDA */}
           {activeSection === "agenda" && (
-            <div className="animate-fade-in space-y-6">
+            <div className="animate-fade-in space-y-6 max-w-4xl">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <Card className="bg-navy text-white border-none rounded-2xl shadow-premium overflow-hidden relative">
                    <CardContent className="p-6">
