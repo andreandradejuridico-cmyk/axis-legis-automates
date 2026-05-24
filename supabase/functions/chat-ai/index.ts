@@ -69,13 +69,22 @@ Deno.serve(async (req) => {
     });
 
     // 3. Load Context Data
-    const { data: cfg } = await supabase
+    const { data: configData } = await supabase
       .from("ai_agent_config")
-      .select("system_prompt, rules_prompt, temperature, model, enabled, openai_api_key, gemini_api_key, openrouter_api_key, lovable_api_key")
+      .select("id, system_prompt, rules_prompt, temperature, model, enabled")
       .eq("enabled", true)
       .maybeSingle();
 
-    if (!cfg) return new Response(JSON.stringify({ reply: "Agente desativado." }), { status: 200 });
+    if (!configData) return new Response(JSON.stringify({ reply: "Agente desativado." }), { status: 200 });
+
+    // Fetch keys securely from the private table (Edge Function uses service_role, so it bypasses RLS)
+    const { data: keysData } = await supabase
+      .from("ai_agent_keys")
+      .select("openai_api_key, gemini_api_key, openrouter_api_key, lovable_api_key")
+      .eq("id", configData.id)
+      .maybeSingle();
+
+    const cfg = { ...configData, ...keysData };
 
     const [bhRes, knowledgeRes, historyRes] = await Promise.all([
       supabase.from("business_hours").select("*"),

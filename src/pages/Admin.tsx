@@ -144,8 +144,9 @@ const Admin = () => {
       }
     }
 
-    const [a, w, c, app, bh, k, tu, msg] = await Promise.all([
+    const [a, keysRes, w, c, app, bh, k, tu, msg] = await Promise.all([
       adminCheck ? supabase.from("ai_agent_config").select("*").order("created_at", { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null, error: null }),
+      adminCheck ? supabase.from("ai_agent_keys").select("*").limit(1).maybeSingle() : Promise.resolve({ data: null, error: null }),
       adminCheck ? supabase.from("whatsapp_settings").select("*").order("created_at", { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null, error: null }),
       supabase.from("chat_conversations").select("*", { count: 'exact' }).order("created_at", { ascending: false }).limit(20),
       supabase.from("appointments").select("*").order("appointment_time", { ascending: true }).limit(100),
@@ -158,7 +159,8 @@ const Admin = () => {
     if (c.error) console.error("Error fetching conversations:", c.error);
     console.log("Conversations fetched:", c.data?.length, "Total count:", c.count);
 
-    setAgent(a.data as any);
+    const mergedAgent = a.data ? { ...a.data, ...keysRes?.data } : null;
+    setAgent(mergedAgent as any);
     setWa(w.data as any);
     setConversations((c.data as any) ?? []);
     setAppointments((app.data as any) ?? []);
@@ -206,7 +208,8 @@ const Admin = () => {
   const saveAgent = async () => {
     if (!agent) return;
     setSaving(true);
-    const { error } = await supabase
+    
+    const { error: configError } = await supabase
       .from("ai_agent_config")
       .update({
         agent_name: agent.agent_name,
@@ -217,14 +220,30 @@ const Admin = () => {
         initial_options: agent.initial_options,
         temperature: agent.temperature,
         enabled: agent.enabled,
+      })
+      .eq("id", agent.id);
+
+    if (configError) {
+      setSaving(false);
+      return toast.error("Erro ao salvar configurações: " + configError.message);
+    }
+
+    const { error: keysError } = await supabase
+      .from("ai_agent_keys")
+      .upsert({
+        id: agent.id,
         openai_api_key: agent.openai_api_key,
         gemini_api_key: agent.gemini_api_key,
         openrouter_api_key: agent.openrouter_api_key,
         lovable_api_key: agent.lovable_api_key,
-      })
-      .eq("id", agent.id);
+      });
+
     setSaving(false);
-    error ? toast.error(error.message) : toast.success("Agente atualizado.");
+    if (keysError) {
+      toast.error("Configurações salvas, mas erro ao salvar chaves: " + keysError.message);
+    } else {
+      toast.success("Configurações e chaves do agente atualizadas.");
+    }
   };
 
   const saveWa = async () => {

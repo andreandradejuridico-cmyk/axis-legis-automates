@@ -81,8 +81,9 @@ Deno.serve(async (req) => {
     });
 
     // 3. Load Context & Config (Sync with chat-ai)
-    const [cfgRes, bhRes, knowledgeRes, historyRes] = await Promise.all([
-      supabase.from("ai_agent_config").select("*").eq("enabled", true).maybeSingle(),
+    const [cfgRes, keysRes, bhRes, knowledgeRes, historyRes] = await Promise.all([
+      supabase.from("ai_agent_config").select("id, system_prompt, rules_prompt, temperature, model, enabled").eq("enabled", true).maybeSingle(),
+      supabase.from("ai_agent_keys").select("openai_api_key, gemini_api_key, openrouter_api_key, lovable_api_key").limit(1).maybeSingle(),
       supabase.from("business_hours").select("*"),
       supabase.from("agent_knowledge").select("title, content").eq("is_active", true),
       supabase
@@ -93,12 +94,14 @@ Deno.serve(async (req) => {
         .limit(10),
     ]);
 
-    const cfg = cfgRes.data;
-    if (!cfg) {
+    const configData = cfgRes.data;
+    if (!configData) {
       return new Response(JSON.stringify({ ok: true, msg: "Agente desativado" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const cfg = { ...configData, ...keysRes.data };
 
     const bh = bhRes.data || [];
     const knowledge = knowledgeRes.data || [];
