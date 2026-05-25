@@ -7,12 +7,14 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Loader2, LogOut, MessageSquare, Bot, Smartphone, Users, LayoutDashboard, ChevronRight, Calendar, Clock, Coins, BarChart3, UserCheck, Mail, Trash2 } from "lucide-react";
+import { Loader2, LogOut, MessageSquare, Bot, Smartphone, Users, LayoutDashboard, ChevronRight, Calendar, Clock, Coins, BarChart3, UserCheck, Mail, Trash2, Upload, FileText, CheckCircle2, AlertCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Slider } from "@/components/ui/slider";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { CustomCalendar } from "@/components/CustomCalendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { parseFile } from "@/lib/fileParser";
 
 type AgentCfg = {
   id: string;
@@ -112,6 +114,17 @@ const Admin = () => {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [knowledge, setKnowledge] = useState<Knowledge[]>([]);
   const [tokenUsage, setTokenUsage] = useState<TokenUsage[]>([]);
+  const [isAddKnowledgeOpen, setIsAddKnowledgeOpen] = useState(false);
+  const [manualTitle, setManualTitle] = useState("");
+  const [manualContent, setManualContent] = useState("");
+  const [manualCategory, setManualCategory] = useState("Geral");
+  const [uploadCategory, setUploadCategory] = useState("Geral");
+  const [uploadingFiles, setUploadingFiles] = useState<{
+    id: string;
+    file: File;
+    status: 'idle' | 'parsing' | 'saving' | 'success' | 'error';
+    errorMsg?: string;
+  }[]>([]);
 
   const [isAdmin, setIsAdmin] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
@@ -325,18 +338,114 @@ const Admin = () => {
     }
   };
 
-  const addKnowledge = async () => {
-    const { data, error } = await supabase.from("agent_knowledge").insert({
-      title: "Novo Tópico",
-      content: "Conteúdo aqui...",
-      category: "Geral"
-    }).select().single();
-    
-    if (error) {
-      toast.error("Erro ao adicionar: " + error.message);
-    } else {
+  const openAddKnowledgeModal = () => {
+    setManualTitle("");
+    setManualContent("");
+    setManualCategory("Geral");
+    setUploadCategory("Geral");
+    setUploadingFiles([]);
+    setIsAddKnowledgeOpen(true);
+  };
+
+  const handleSaveManualKnowledge = async () => {
+    if (!manualTitle.trim()) {
+      toast.error("Por favor, digite um título.");
+      return;
+    }
+    if (!manualContent.trim()) {
+      toast.error("Por favor, preencha o conteúdo.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const { data, error } = await supabase.from("agent_knowledge").insert({
+        title: manualTitle.trim(),
+        content: manualContent.trim(),
+        category: manualCategory.trim() || "Geral"
+      }).select().single();
+
+      if (error) throw error;
+
       setKnowledge([data as Knowledge, ...knowledge]);
-      toast.success("Tópico adicionado.");
+      toast.success("Tópico adicionado com sucesso!");
+      setIsAddKnowledgeOpen(false);
+    } catch (err: any) {
+      console.error("Error saving manual knowledge:", err);
+      toast.error("Erro ao adicionar: " + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleFileSelection = (selectedFiles: FileList | null) => {
+    if (!selectedFiles) return;
+    const newFiles = Array.from(selectedFiles).map(file => ({
+      id: Math.random().toString(36).substring(2, 9),
+      file,
+      status: 'idle' as const
+    }));
+    setUploadingFiles(prev => [...prev, ...newFiles]);
+  };
+
+  const removeSelectedFile = (id: string) => {
+    setUploadingFiles(prev => prev.filter(f => f.id !== id));
+  };
+
+  const handleUploadFiles = async () => {
+    if (uploadingFiles.length === 0) {
+      toast.error("Por favor, selecione pelo menos um arquivo.");
+      return;
+    }
+
+    setSaving(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    const filePromises = uploadingFiles.map(async (item) => {
+      if (item.status === 'success') return;
+
+      setUploadingFiles(prev => prev.map(f => f.id === item.id ? { ...f, status: 'parsing' } : f));
+
+      try {
+        const text = await parseFile(item.file);
+        
+        if (!text.trim()) {
+          throw new Error("Não foi possível extrair texto legível deste arquivo.");
+        }
+
+        setUploadingFiles(prev => prev.map(f => f.id === item.id ? { ...f, status: 'saving' } : f));
+
+        const { data, error } = await supabase.from("agent_knowledge").insert({
+          title: item.file.name,
+          content: text,
+          category: uploadCategory.trim() || "Geral"
+        }).select().single();
+
+        if (error) throw error;
+
+        setKnowledge(prev => [data as Knowledge, ...prev]);
+        setUploadingFiles(prev => prev.map(f => f.id === item.id ? { ...f, status: 'success' } : f));
+        successCount++;
+      } catch (err: any) {
+        console.error(`Error processing file ${item.file.name}:`, err);
+        setUploadingFiles(prev => prev.map(f => f.id === item.id ? { ...f, status: 'error', errorMsg: err.message || "Erro desconhecido" } : f));
+        failCount++;
+      }
+    });
+
+    await Promise.all(filePromises);
+    setSaving(false);
+
+    if (successCount > 0 && failCount === 0) {
+      toast.success(`${successCount} arquivo(s) processado(s) e adicionado(s) com sucesso!`);
+      setTimeout(() => {
+        setIsAddKnowledgeOpen(false);
+      }, 1000);
+    } else if (successCount > 0 && failCount > 0) {
+      toast.warning(`${successCount} arquivo(s) adicionado(s), mas ${failCount} falhou.`);
+    } else if (failCount > 0) {
+      toast.error(`Falha ao processar arquivos. Verifique os erros listados.`);
     }
   };
 
@@ -1201,7 +1310,7 @@ const Admin = () => {
                   <h3 className="text-xl font-serif text-navy">Base de Conhecimento</h3>
                   <p className="text-sm text-muted-foreground">Adicione informações que o agente usará como fonte da verdade.</p>
                 </div>
-                <Button onClick={addKnowledge} className="bg-bronze hover:bg-bronze-glow text-accent-foreground">
+                <Button onClick={openAddKnowledgeModal} className="bg-bronze hover:bg-bronze-glow text-accent-foreground">
                   + Adicionar Tópico
                 </Button>
               </div>
@@ -1671,6 +1780,248 @@ const Admin = () => {
                     </div>
                   ))
                 )}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Modal de Adição de Tópicos / Arquivos na Base de Conhecimento */}
+          <Dialog open={isAddKnowledgeOpen} onOpenChange={setIsAddKnowledgeOpen}>
+            <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 overflow-hidden border-border/50 shadow-premium">
+              <DialogHeader className="p-6 pb-4 border-b border-border/50 bg-muted/20">
+                <DialogTitle className="font-serif text-xl text-navy">
+                  Adicionar Conteúdo à Base de Conhecimento
+                </DialogTitle>
+                <DialogDescription>
+                  Alimente a IA com novos dados via upload de arquivos ou inserção manual.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="flex-1 overflow-y-auto p-6 bg-[#f8f9fa]">
+                <Tabs defaultValue="file-upload" className="w-full space-y-6">
+                  <TabsList className="grid w-full grid-cols-2 bg-muted/50 p-1">
+                    <TabsTrigger value="file-upload">Upload de Arquivos</TabsTrigger>
+                    <TabsTrigger value="manual-entry">Inserção Manual</TabsTrigger>
+                  </TabsList>
+
+                  {/* TAB 1: FILE UPLOAD */}
+                  <TabsContent value="file-upload" className="space-y-6 animate-fade-in outline-none">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="upload-category" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          Categoria para os Arquivos
+                        </Label>
+                        <Input
+                          id="upload-category"
+                          value={uploadCategory}
+                          onChange={(e) => setUploadCategory(e.target.value)}
+                          placeholder="Ex: Geral, Trabalhista, Contratos"
+                          className="bg-white border-border"
+                        />
+                      </div>
+
+                      {/* Drag & Drop Zone */}
+                      <div
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleFileSelection(e.dataTransfer.files);
+                        }}
+                        onClick={() => {
+                          const fileInput = document.getElementById("knowledge-file-input");
+                          if (fileInput) fileInput.click();
+                        }}
+                        className="border-2 border-dashed border-border/70 hover:border-bronze rounded-xl p-8 text-center cursor-pointer bg-white transition-all hover:bg-bronze/5 flex flex-col items-center justify-center gap-3 group relative overflow-hidden"
+                      >
+                        <input
+                          id="knowledge-file-input"
+                          type="file"
+                          multiple
+                          accept=".pdf,.txt,.md,.csv"
+                          onChange={(e) => handleFileSelection(e.target.files)}
+                          className="hidden"
+                        />
+                        <div className="p-4 bg-bronze/10 rounded-full text-bronze group-hover:scale-110 transition-transform duration-300">
+                          <Upload size={28} />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-navy text-sm">
+                            Arraste seus arquivos aqui ou <span className="text-bronze underline">clique para buscar</span>
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Formatos suportados: PDF, TXT, MD, CSV (Max: 10MB por arquivo)
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Selected Files List */}
+                      {uploadingFiles.length > 0 && (
+                        <div className="space-y-3">
+                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                            Arquivos Selecionados ({uploadingFiles.length})
+                          </h4>
+                          <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                            {uploadingFiles.map((item) => (
+                              <div
+                                key={item.id}
+                                className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-white shadow-sm"
+                              >
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                  <FileText className="text-muted-foreground shrink-0" size={18} />
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-xs font-medium text-navy truncate" title={item.file.name}>
+                                      {item.file.name}
+                                    </p>
+                                    <p className="text-[10px] text-muted-foreground">
+                                      {(item.file.size / 1024).toFixed(1)} KB
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 shrink-0 ml-3">
+                                  {item.status === 'idle' && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => removeSelectedFile(item.id)}
+                                      className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                    >
+                                      <Trash2 size={14} />
+                                    </Button>
+                                  )}
+                                  {item.status === 'parsing' && (
+                                    <span className="text-[10px] font-medium text-bronze animate-pulse flex items-center gap-1">
+                                      <Loader2 className="animate-spin" size={10} />
+                                      Lendo texto...
+                                    </span>
+                                  )}
+                                  {item.status === 'saving' && (
+                                    <span className="text-[10px] font-medium text-blue-500 animate-pulse flex items-center gap-1">
+                                      <Loader2 className="animate-spin" size={10} />
+                                      Salvando...
+                                    </span>
+                                  )}
+                                  {item.status === 'success' && (
+                                    <span className="text-[10px] font-medium text-green-600 flex items-center gap-1 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">
+                                      <CheckCircle2 size={10} />
+                                      Importado
+                                    </span>
+                                  )}
+                                  {item.status === 'error' && (
+                                    <span
+                                      className="text-[10px] font-medium text-red-600 flex items-center gap-1 bg-red-50 px-2 py-0.5 rounded-full border border-red-100 cursor-help"
+                                      title={item.errorMsg}
+                                    >
+                                      <AlertCircle size={10} />
+                                      Erro
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsAddKnowledgeOpen(false)}
+                        disabled={saving}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        onClick={handleUploadFiles}
+                        disabled={saving || uploadingFiles.length === 0 || uploadingFiles.every(f => f.status === 'success')}
+                        className="bg-bronze hover:bg-bronze-glow text-accent-foreground"
+                      >
+                        {saving ? (
+                          <>
+                            <Loader2 className="animate-spin mr-2" size={16} />
+                            Enviando...
+                          </>
+                        ) : (
+                          "Importar Arquivos"
+                        )}
+                      </Button>
+                    </div>
+                  </TabsContent>
+
+                  {/* TAB 2: MANUAL ENTRY */}
+                  <TabsContent value="manual-entry" className="space-y-4 animate-fade-in outline-none">
+                    <div className="space-y-4 bg-white p-5 rounded-xl border border-border/50 shadow-sm">
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="manual-title" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                            Título do Assunto
+                          </Label>
+                          <Input
+                            id="manual-title"
+                            value={manualTitle}
+                            onChange={(e) => setManualTitle(e.target.value)}
+                            placeholder="Ex: Custas Judiciais"
+                            className="bg-background border-border"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="manual-category" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                            Categoria
+                          </Label>
+                          <Input
+                            id="manual-category"
+                            value={manualCategory}
+                            onChange={(e) => setManualCategory(e.target.value)}
+                            placeholder="Ex: Geral"
+                            className="bg-background border-border"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="manual-content" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          Conteúdo Detalhado
+                        </Label>
+                        <Textarea
+                          id="manual-content"
+                          value={manualContent}
+                          onChange={(e) => setManualContent(e.target.value)}
+                          rows={6}
+                          placeholder="Digite aqui o texto explicativo completo que a IA utilizará para consulta..."
+                          className="bg-background border-border resize-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsAddKnowledgeOpen(false)}
+                        disabled={saving}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        onClick={handleSaveManualKnowledge}
+                        disabled={saving}
+                        className="bg-bronze hover:bg-bronze-glow text-accent-foreground"
+                      >
+                        {saving ? (
+                          <>
+                            <Loader2 className="animate-spin mr-2" size={16} />
+                            Salvando...
+                          </>
+                        ) : (
+                          "Salvar Tópico"
+                        )}
+                      </Button>
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </div>
             </DialogContent>
           </Dialog>
